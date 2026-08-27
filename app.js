@@ -1,4 +1,4 @@
-// EC2 Cheaper Finder — client-side matching against the pre-trimmed, per-region files in
+// EC2 Undercut — client-side matching against the pre-trimmed, per-region files in
 // data/regions/ (see scripts/refresh-data.js and docs/SPEC.md for how those are built).
 //
 // data/regions/index.json is small and loaded once at startup to populate the region

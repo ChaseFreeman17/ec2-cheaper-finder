@@ -1,4 +1,4 @@
-# EC2 Cheaper Finder — Spec
+# EC2 Undercut — Spec
 
 See [`CONTEXT.md`](../CONTEXT.md) for glossary terms (**region**, **baseline**,
 **candidate**, **match**, **flagged difference**, **excluded type**, etc.) used

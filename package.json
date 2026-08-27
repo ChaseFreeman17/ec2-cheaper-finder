@@ -1,5 +1,5 @@
 {
-  "name": "ec2-cheaper-finder",
+  "name": "ec2-undercut",
   "version": "1.0.0",
   "private": true,
   "description": "Find current-generation EC2 instance types with the same vCPU/RAM at a cheaper On-Demand price.",

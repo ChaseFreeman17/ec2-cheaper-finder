@@ -1,9 +1,11 @@
-# EC2 Cheaper Finder
+# EC2 Undercut
 
-A static site: enter an EC2 instance type, get back current-generation instance types
-with the exact same vCPU/RAM that cost less On-Demand in `us-east-1`, with network/EBS
-bandwidth/storage-type/burstable differences flagged. See [`docs/SPEC.md`](docs/SPEC.md)
-for the full design and [`CONTEXT.md`](CONTEXT.md) for the glossary.
+A static site: pick an AWS region, enter an EC2 instance type, get back
+current-generation instance types with at least as much vCPU/RAM that cost less
+On-Demand in that region — with any extra vCPU/RAM, network/EBS bandwidth,
+storage-type, and burstable-CPU differences all flagged. See
+[`docs/SPEC.md`](docs/SPEC.md) for the full design and [`CONTEXT.md`](CONTEXT.md) for
+the glossary.
 
 ## Running locally
 
@@ -14,8 +16,9 @@ npx serve .
 # or: python -m http.server 8000
 ```
 
-Then open the printed local URL. `data/instances.json` is already checked into the repo
-(refreshed daily by CI), so it works without fetching anything from AWS yourself.
+Then open the printed local URL. `data/regions/` is already checked into the repo (one
+JSON file per AWS region, refreshed daily by CI), so it works without fetching anything
+from AWS yourself.
 
 ## Refreshing the pricing data manually
 
@@ -23,10 +26,11 @@ Then open the printed local URL. `data/instances.json` is already checked into t
 node scripts/refresh-data.js
 ```
 
-This hits the public AWS Price List Bulk API (no AWS credentials needed) and rewrites
-`data/instances.json`. It downloads a large (several-hundred-MB) file, so give it a
-minute. `.github/workflows/refresh-data.yml` runs this daily and commits the result
-automatically.
+This hits the public AWS Price List Bulk API (no AWS credentials needed) once per region
+listed in `scripts/regions.js` (~35 regions) and rewrites `data/regions/`. Each region's
+raw offer file is several-hundred-MB, fetched one region at a time, so a full run takes
+a couple of minutes. `.github/workflows/refresh-data.yml` runs this daily and commits
+the result automatically.
 
 ## Deploying to GitHub Pages
 

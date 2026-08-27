@@ -1,8 +1,8 @@
-# EC2 Cheaper Finder
+# EC2 Undercut
 
 A static web tool: given a baseline EC2 instance type in a chosen AWS region, find
-current-generation instance types with the exact same vCPU count and RAM that cost less
-on On-Demand pricing in that same region, while surfacing (not filtering on) other
+current-generation instance types with at least as much vCPU count and RAM that cost
+less on On-Demand pricing in that same region, while surfacing (not filtering on) other
 characteristics that also changed.
 
 ## Language
