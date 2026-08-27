@@ -96,8 +96,8 @@ picker without fetching every region's full data:
 {
   "generatedAt": "2026-08-27T06:17:00.000Z",
   "regions": [
-    { "code": "us-east-1", "name": "US East (N. Virginia)", "instanceCount": 1909, "generatedAt": "..." },
-    { "code": "il-central-1", "name": "Israel (Tel Aviv)", "instanceCount": 475, "generatedAt": "...", "stale": true }
+    { "code": "us-east-1", "name": "US East (N. Virginia)", "group": "US", "instanceCount": 1909, "generatedAt": "..." },
+    { "code": "il-central-1", "name": "Israel (Tel Aviv)", "group": "Israel", "instanceCount": 475, "generatedAt": "...", "stale": true }
   ]
 }
 ```
@@ -152,10 +152,14 @@ rather than mixing OSes in a single comparison.
 Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no framework).
 
 - **Region select**: a `<select>` populated from `data/regions/index.json` at load,
-  defaulting to `us-east-1`. Changing it clears any results, loads that region's data
-  (fetched once, cached in memory for the session), and rebuilds the instance-type
-  autocomplete list below. A region flagged `stale` in the index (its last refresh
-  failed and this is yesterday's data) is labeled "(data delayed)" in the dropdown.
+  defaulting to `us-east-1`, grouped into `<optgroup>`s by continent/geography (per
+  region's `group` field — GovCloud gets its own group rather than folding into "US").
+  Within a group, the redundant continent prefix is trimmed from each option's label
+  (e.g. "Asia Pacific (Seoul)" reads as just "Seoul" under an "Asia Pacific" heading).
+  Changing the selection clears any results, loads that region's data (fetched once,
+  cached in memory for the session), and rebuilds the instance-type autocomplete list
+  below. A region flagged `stale` in the index (its last refresh failed and this is
+  yesterday's data) is labeled "(data delayed)" in the dropdown.
 - **Instance type input**: a hand-rolled autocomplete combobox, not plain free text or a
   native `<select>` — free text doesn't validate as you type, and a `<select>` listing
   every instance type in a region (or across all regions) isn't browsable. Typing

@@ -221,7 +221,7 @@ async function main() {
 
   const summary = [];
 
-  for (const { code, name } of REGIONS) {
+  for (const { code, name, group } of REGIONS) {
     const meta = regionIndex.regions && regionIndex.regions[code];
     if (!meta) {
       console.warn(`[${code}] skipping: not present in AWS's region index (may have been retired).`);
@@ -251,7 +251,7 @@ async function main() {
       console.log(
         `[${code}] rows: ${instances.length} (seen ${seen}, excluded ${excluded}, filtered ${filteredOut}, no-price ${noPrice})`
       );
-      summary.push({ code, name, instanceCount: instances.length, generatedAt });
+      summary.push({ code, name, group, instanceCount: instances.length, generatedAt });
     } catch (err) {
       console.error(`[${code}] FAILED: ${err.message}`);
       // A transient failure for one region shouldn't nuke that region's last-known-good
@@ -262,16 +262,17 @@ async function main() {
           summary.push({
             code,
             name,
+            group,
             instanceCount: prev.instances.length,
             generatedAt: prev.generatedAt,
             stale: true,
           });
           console.warn(`[${code}] keeping previous data from ${prev.generatedAt}`);
         } catch {
-          summary.push({ code, name, instanceCount: 0, generatedAt: null, failed: true });
+          summary.push({ code, name, group, instanceCount: 0, generatedAt: null, failed: true });
         }
       } else {
-        summary.push({ code, name, instanceCount: 0, generatedAt: null, failed: true });
+        summary.push({ code, name, group, instanceCount: 0, generatedAt: null, failed: true });
       }
     }
 

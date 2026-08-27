@@ -26,6 +26,7 @@ const CONTINENT_LABELS = {
 const KNOWN_NAMES = {
   "af-south-1": "Africa (Cape Town)",
   "ap-east-1": "Asia Pacific (Hong Kong)",
+  "ap-east-2": "Asia Pacific (Taipei)",
   "ap-northeast-1": "Asia Pacific (Tokyo)",
   "ap-northeast-2": "Asia Pacific (Seoul)",
   "ap-northeast-3": "Asia Pacific (Osaka)",
@@ -81,6 +82,20 @@ function nameForRegion(code) {
   return `${CONTINENT_LABELS[prefix] || prefix.toUpperCase()} (${code})`;
 }
 
-const REGIONS = REGION_CODES.map((code) => ({ code, name: nameForRegion(code) }));
+// A rougher grouping than nameForRegion's per-region label, used to bucket the region
+// picker into <optgroup>s (see app.js's populateRegionSelect) — GovCloud gets its own
+// group since it's a separate, compliance-only partition rather than "just another US
+// region" to a teammate scanning the list.
+function groupForRegion(code) {
+  if (code.startsWith("us-gov-")) return "AWS GovCloud (US)";
+  const prefix = code.split("-")[0];
+  return CONTINENT_LABELS[prefix] || "Other";
+}
+
+const REGIONS = REGION_CODES.map((code) => ({
+  code,
+  name: nameForRegion(code),
+  group: groupForRegion(code),
+}));
 
 module.exports = { REGIONS };

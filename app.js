@@ -90,14 +90,40 @@ function pickDefaultRegion(regionsIndex) {
   return available[0] ? available[0].code : DEFAULT_REGION;
 }
 
+// Within its group, a region's full name usually repeats the group name (e.g. "Asia
+// Pacific (Seoul)" under an "Asia Pacific" optgroup) — strip that redundant prefix so
+// the option just reads "Seoul", "Tokyo", etc. Falls back to the full name if it
+// doesn't start with the group label (e.g. GovCloud's "AWS GovCloud (US-East)" under
+// "AWS GovCloud (US)").
+function shortRegionLabel(name, group) {
+  if (!name.startsWith(group)) return name;
+  const rest = name.slice(group.length).trim();
+  if (!rest) return name;
+  const parenOnly = rest.match(/^\(([^)]+)\)$/);
+  return parenOnly ? parenOnly[1] : rest;
+}
+
 function populateRegionSelect(regionsIndex) {
   els.regionSelect.innerHTML = "";
-  const sorted = regionsIndex.regions
-    .filter((r) => !r.failed) // never had usable data — nothing to offer
-    .sort((a, b) => a.name.localeCompare(b.name));
-  for (const r of sorted) {
-    const label = r.stale ? `${r.name} (data delayed)` : r.name;
-    els.regionSelect.appendChild(el("option", { value: r.code, text: label }));
+  const available = regionsIndex.regions.filter((r) => !r.failed); // never had usable data
+
+  const groups = new Map(); // group label -> regions[]
+  for (const r of available) {
+    const group = r.group || "Other";
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(r);
+  }
+
+  const groupNames = [...groups.keys()].sort((a, b) => a.localeCompare(b));
+  for (const groupName of groupNames) {
+    const regions = groups.get(groupName).sort((a, b) => a.name.localeCompare(b.name));
+    const optgroup = el("optgroup", { label: groupName }, []);
+    for (const r of regions) {
+      const shortName = shortRegionLabel(r.name, groupName);
+      const label = r.stale ? `${shortName} (data delayed)` : shortName;
+      optgroup.appendChild(el("option", { value: r.code, text: label }));
+    }
+    els.regionSelect.appendChild(optgroup);
   }
 }
 
