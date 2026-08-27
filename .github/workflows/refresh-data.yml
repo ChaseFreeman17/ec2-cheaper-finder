@@ -27,7 +27,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Fetch + trim AWS pricing data (all regions)
         run: node scripts/refresh-data.js
@@ -36,7 +36,10 @@ jobs:
 
       - name: Commit data if it changed
         run: |
-          if git diff --quiet -- data/regions; then
+          # git diff alone misses brand-new untracked files (e.g. data/regions/ before
+          # its first commit) — `git status --porcelain` catches both that and modified
+          # tracked files.
+          if [ -z "$(git status --porcelain -- data/regions)" ]; then
             echo "No pricing changes."
             exit 0
           fi
