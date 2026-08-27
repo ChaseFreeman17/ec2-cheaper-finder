@@ -23,9 +23,20 @@ _Avoid_: Equivalent, alternative, substitute
 
 **Flagged difference**:
 An attribute where the match's value differs from the baseline's, shown alongside a
-match rather than used to filter it out: network performance, EBS bandwidth/IOPS,
-storage type (instance-store vs. EBS-only), and burstable-vs-fixed CPU performance.
+match rather than used to filter it out: network performance, EBS bandwidth/IOPS, and
+storage type (instance-store vs. EBS-only).
 _Avoid_: Trade-off, side effect
+
+**Burst-capable**:
+An instance type whose CPU performance isn't fixed, via either of two distinct AWS
+mechanisms: classic **T-family** (credit-based — earns/spends CPU credits, throttles
+hard to baseline once credits run out) or a **flex** family (`c7i-flex`, `c8i-flex`,
+`m7i-flex`, `m8i-flex`, `r8i-flex`, ...) — ~40% baseline CPU, bursts to 100% for up to
+95% of a rolling 24-hour window, with gradual (not hard) throttling under sustained high
+utilization. Unlike an ordinary flagged difference, a burst-capable **candidate** is
+highlighted prominently wherever it appears — not just noted when it differs from the
+baseline — since it changes CPU performance guarantees rather than a peripheral spec.
+_Avoid_: Burstable (on its own, implies only T-family and misses flex)
 
 **Excluded type**:
 An instance type never considered as a baseline or candidate: any accelerated type (GPU,

@@ -45,9 +45,19 @@ function parseMemoryGiB(memoryAttr) {
   return parseFloat(cleaned);
 }
 
-function isBurstable(instanceType) {
-  const family = instanceType.split(".")[0];
-  return /^t\d/i.test(family);
+// Two distinct AWS mechanisms both mean "CPU performance isn't fixed", and both need to
+// be surfaced — see CONTEXT.md's "Burst-capable" entry:
+//   - "credit": classic T-family (t2/t3/t3a/t4g/...) — earns/spends CPU credits, throttles
+//     hard to baseline once credits run out.
+//   - "flex": *-flex families (c7i-flex, c8i-flex, m7i-flex, m8i-flex, r8i-flex, ...) —
+//     ~40% baseline, bursts to 100% for up to 95% of a rolling 24h window, with gradual
+//     (not hard) throttling under sustained high utilization.
+// Returns null for fixed-performance instance types.
+function burstKindOf(instanceType) {
+  const family = instanceType.split(".")[0].toLowerCase();
+  if (/^t\d/.test(family)) return "credit";
+  if (family.endsWith("-flex")) return "flex";
+  return null;
 }
 
 function architectureOf(physicalProcessor) {
@@ -157,7 +167,7 @@ async function main() {
       dedicatedEbsThroughput:
         attrs.dedicatedEbsThroughput || attrs.dedicatedEbsThroughputDescription || "Not supported",
       storageType: attrs.storage === "EBS only" ? "EBS-only" : "instance-store",
-      burstable: isBurstable(attrs.instanceType),
+      burstKind: burstKindOf(attrs.instanceType),
     };
 
     if (Number.isNaN(row.vcpu) || Number.isNaN(row.memoryGiB)) {

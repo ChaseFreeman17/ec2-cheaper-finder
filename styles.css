@@ -296,6 +296,28 @@ body {
   padding: 2px 7px;
 }
 
+.pill-warning {
+  background: #92400e;
+  color: #fff7ed;
+  cursor: help;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pill-warning {
+    background: #b45309;
+    color: #fff7ed;
+  }
+}
+
+:root[data-theme="dark"] .pill-warning {
+  background: #b45309;
+  color: #fff7ed;
+}
+
+.burst-row {
+  box-shadow: inset 3px 0 0 var(--pill-warning-accent, #b45309);
+}
+
 .results-table {
   width: 100%;
   border-collapse: collapse;

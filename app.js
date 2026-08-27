@@ -10,6 +10,22 @@ const EXCLUSION_MESSAGES = {
     "it isn't a standard compute instance type (e.g. a dedicated host or another non-instance line item).",
 };
 
+// Both mechanisms mean "CPU performance isn't fixed" and get the same prominent
+// highlight — see CONTEXT.md's "Burst-capable" entry for why these are distinct from
+// (and more important than) the other flagged differences.
+const BURST_KIND_INFO = {
+  credit: {
+    label: "Burstable (credits)",
+    tooltip:
+      "T-family: earns CPU credits while below its baseline and spends them while bursting above it. Running out of credits throttles it hard to baseline.",
+  },
+  flex: {
+    label: "Flex (baseline/burst)",
+    tooltip:
+      "~40% baseline CPU, can burst to 100% for up to 95% of a rolling 24-hour window. Sustained high utilization gradually reduces burst throughput (no hard credit cliff).",
+  },
+};
+
 const state = {
   data: null, // { generatedAt, region, source, instances: [...], excludedTypes: {...} }
 };
@@ -92,12 +108,9 @@ function flaggedDifferences(baseline, candidate) {
       text: `${baseline.storageType} → ${candidate.storageType}`,
     });
   }
-  if (candidate.burstable !== baseline.burstable) {
-    flags.push({
-      label: "CPU",
-      text: candidate.burstable ? "fixed → burstable" : "burstable → fixed",
-    });
-  }
+  // Burst-capable candidates get their own prominent badge (see renderBurstBadge)
+  // instead of being buried in this generic list — CPU credit/flex throttling is a
+  // bigger behavioral gotcha than a peripheral spec difference.
   if (candidate.architecture !== baseline.architecture) {
     flags.push({
       label: "Architecture",
@@ -105,6 +118,12 @@ function flaggedDifferences(baseline, candidate) {
     });
   }
   return flags;
+}
+
+function renderBurstBadge(row) {
+  if (!row.burstKind) return null;
+  const info = BURST_KIND_INFO[row.burstKind];
+  return el("span", { class: "pill pill-warning small", title: info.tooltip, text: `⚡ ${info.label}` });
 }
 
 function formatMoney(n) {
@@ -135,6 +154,8 @@ function renderBaselineCard(baseline) {
   if (!baseline.currentGeneration) {
     titleParts.push(el("span", { class: "pill pill-muted", text: "Previous-gen" }));
   }
+  const baselineBurstBadge = renderBurstBadge(baseline);
+  if (baselineBurstBadge) titleParts.push(baselineBurstBadge);
 
   const card = el("div", { class: "baseline-card" }, [
     el("div", { class: "baseline-title" }, titleParts),
@@ -192,12 +213,16 @@ function renderResultsTable(baseline, matches) {
       }
     }
 
+    const typeCell = el("td", null, [
+      el("strong", { text: candidate.instanceType }),
+      el("span", { class: "pill pill-muted small", text: candidate.architecture }),
+    ]);
+    const burstBadge = renderBurstBadge(candidate);
+    if (burstBadge) typeCell.appendChild(burstBadge);
+
     tbody.appendChild(
-      el("tr", null, [
-        el("td", null, [
-          el("strong", { text: candidate.instanceType }),
-          el("span", { class: "pill pill-muted small", text: candidate.architecture }),
-        ]),
+      el("tr", { class: candidate.burstKind ? "burst-row" : "" }, [
+        typeCell,
         el("td", { text: formatMoney(candidate.pricePerHour) }),
         el("td", { class: "savings" }, [
           el("span", { class: "savings-abs", text: `-${formatMoney(savingsPerHour)}` }),

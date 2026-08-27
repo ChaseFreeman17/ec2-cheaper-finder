@@ -64,7 +64,7 @@ baselines, just never valid candidates — see CONTEXT.md's "Current-generation"
   "networkPerformance": "Up to 12.5 Gigabit",
   "dedicatedEbsThroughput": "Up to 4750 Mbps",
   "storageType": "EBS-only" | "instance-store",
-  "burstable": false
+  "burstKind": "credit" | "flex" | null
 }
 ```
 
@@ -73,10 +73,11 @@ reads `attributes.instanceType`, `.vcpu`, `.memory`, `.currentGeneration`,
 `.networkPerformance`, `.dedicatedEbsThroughput`/`.dedicatedEbsThroughputDescription`,
 `.storage`, `.physicalProcessor`, `.instanceFamily`, `.productFamily`, `.tenancy`,
 `.capacitystatus`, `.preInstalledSw`, `.licenseModel`, `.marketoption`,
-`.operatingSystem`). `architecture` and `burstable` are derived rather than read
+`.operatingSystem`). `architecture` and `burstKind` are derived rather than read
 directly: `architecture` is `arm64` when `physicalProcessor` contains "Graviton", else
-`x86_64`; `burstable` is true when the instance-type family prefix matches `t\d` (e.g.
-`t3`, `t4g`).
+`x86_64`; `burstKind` is `"credit"` when the instance-type family prefix matches `t\d`
+(e.g. `t3`, `t4g`), `"flex"` when the family ends in `-flex` (e.g. `m7i-flex`,
+`c8i-flex`), else `null` (see CONTEXT.md's "Burst-capable" entry).
 
 ## Matching algorithm (client-side, in `app.js`)
 
@@ -95,7 +96,10 @@ Given a validated baseline row:
    - `savingsPerHour = baseline.pricePerHour - candidate.pricePerHour`
    - `savingsPercent = savingsPerHour / baseline.pricePerHour * 100`
    - flagged differences: compare `networkPerformance`, `dedicatedEbsThroughput`,
-     `storageType`, `burstable` against the baseline; include only the ones that differ
+     `storageType` against the baseline; include only the ones that differ
+   - burst badge: if `burstKind` is non-null, render a prominent warning-styled badge
+     (not a flagged difference) — shown for *any* burst-capable row, baseline or
+     candidate, regardless of whether the baseline itself was also burst-capable
 3. Sort by `pricePerHour` ascending.
 4. If the baseline itself was excluded from the dataset entirely (accelerated/
    bare-metal/not-a-standard-instance, per ADR-0003), show an explanatory message
