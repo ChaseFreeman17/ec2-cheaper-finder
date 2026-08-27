@@ -116,7 +116,9 @@ body {
   border: 1px solid var(--border);
   background: var(--surface-alt);
   color: var(--text);
-  max-width: 220px;
+  min-width: 200px;
+  max-width: 100%;
+  text-overflow: ellipsis;
 }
 
 .field-instance {
