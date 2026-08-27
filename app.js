@@ -90,19 +90,6 @@ function pickDefaultRegion(regionsIndex) {
   return available[0] ? available[0].code : DEFAULT_REGION;
 }
 
-// Within its group, a region's full name usually repeats the group name (e.g. "Asia
-// Pacific (Seoul)" under an "Asia Pacific" optgroup) — strip that redundant prefix so
-// the option just reads "Seoul", "Tokyo", etc. Falls back to the full name if it
-// doesn't start with the group label (e.g. GovCloud's "AWS GovCloud (US-East)" under
-// "AWS GovCloud (US)").
-function shortRegionLabel(name, group) {
-  if (!name.startsWith(group)) return name;
-  const rest = name.slice(group.length).trim();
-  if (!rest) return name;
-  const parenOnly = rest.match(/^\(([^)]+)\)$/);
-  return parenOnly ? parenOnly[1] : rest;
-}
-
 function populateRegionSelect(regionsIndex) {
   els.regionSelect.innerHTML = "";
   const available = regionsIndex.regions.filter((r) => !r.failed); // never had usable data
@@ -119,8 +106,7 @@ function populateRegionSelect(regionsIndex) {
     const regions = groups.get(groupName).sort((a, b) => a.name.localeCompare(b.name));
     const optgroup = el("optgroup", { label: groupName }, []);
     for (const r of regions) {
-      const shortName = shortRegionLabel(r.name, groupName);
-      const label = r.stale ? `${shortName} (data delayed)` : shortName;
+      const label = r.stale ? `${r.name} (data delayed)` : r.name;
       optgroup.appendChild(el("option", { value: r.code, text: label }));
     }
     els.regionSelect.appendChild(optgroup);
@@ -380,7 +366,7 @@ function renderCombobox() {
   els.comboList.innerHTML = "";
   combo.filtered.forEach((opt, i) => {
     const children = [el("span", { class: "combobox-type", text: opt.type })];
-    if (opt.excluded) children.push(el("span", { class: "combobox-tag", text: "excluded" }));
+    if (opt.excluded) children.push(el("span", { class: "combobox-tag", text: "Excluded" }));
     const li = el(
       "li",
       {

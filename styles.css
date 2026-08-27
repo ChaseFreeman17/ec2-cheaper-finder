@@ -150,7 +150,9 @@ body {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  right: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(420px, 90vw);
   z-index: 20;
   margin: 0;
   padding: 6px;
@@ -166,7 +168,6 @@ body {
 .combobox-option {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
   border-radius: 6px;
@@ -192,6 +193,7 @@ body {
 
 .combobox-tag {
   flex-shrink: 0;
+  margin-left: auto;
   font-family: var(--font);
   font-size: 0.68rem;
   font-weight: 600;
