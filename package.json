@@ -1,0 +1,12 @@
+{
+  "name": "ec2-cheaper-finder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Find current-generation EC2 instance types with the same vCPU/RAM at a cheaper On-Demand price.",
+  "scripts": {
+    "refresh-data": "node scripts/refresh-data.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

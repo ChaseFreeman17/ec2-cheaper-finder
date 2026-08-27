@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+
+# Claude Code project-local tooling, not part of the app itself
+.claude/
+.agents/
+skills-lock.json

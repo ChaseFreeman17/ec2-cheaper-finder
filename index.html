@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EC2 Cheaper Finder</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <h1>EC2 Cheaper Finder</h1>
+      <p class="subtitle">
+        Enter an EC2 instance type. We'll find current-generation types with the exact
+        same vCPU &amp; RAM that cost less On-Demand in <strong>us-east-1</strong> —
+        and flag what else changes along the way.
+      </p>
+    </header>
+
+    <main>
+      <form id="search-form" class="search-card" autocomplete="off">
+        <div class="field field-instance">
+          <label for="instance-type">Baseline instance type</label>
+          <input
+            id="instance-type"
+            name="instance-type"
+            type="text"
+            placeholder="e.g. m5.xlarge"
+            spellcheck="false"
+          />
+        </div>
+
+        <fieldset class="field field-os">
+          <legend>Operating system</legend>
+          <label class="checkbox">
+            <input type="checkbox" id="os-windows" checked />
+            Windows
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="os-linux" />
+            Linux
+          </label>
+        </fieldset>
+
+        <label class="field field-toggle toggle">
+          <input type="checkbox" id="graviton-toggle" />
+          <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+          <span class="toggle-label">Include Graviton (ARM) results</span>
+        </label>
+
+        <button type="submit" class="submit-btn">Find cheaper equivalents</button>
+      </form>
+
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+
+      <section id="results" class="results" hidden></section>
+    </main>
+
+    <footer class="footer">
+      <p id="data-freshness">Loading pricing data…</p>
+      <p class="scope-note">
+        Scope: On-Demand, us-east-1, current-generation only, exact vCPU/RAM match.
+        GPU, FPGA, inference/training-chip, and bare-metal instance types are excluded
+        entirely rather than compared.
+      </p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
