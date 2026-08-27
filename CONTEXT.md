@@ -24,16 +24,21 @@ An instance type being evaluated as a possible match for the baseline.
 _Avoid_: Result, option (before it qualifies)
 
 **Match**:
-A candidate with the exact same vCPU count and exact same RAM (GiB) as the baseline,
-same OS/region/purchase-option scope, current-generation, and cheaper on-demand price.
-There is no "at least as much" or partial-match mode — a candidate either matches or it
-doesn't.
+A candidate with vCPU count and RAM (GiB) both greater than or equal to the baseline's
+(never less), same OS/region/purchase-option scope, current-generation, and cheaper
+on-demand price. Originally exact-only; loosened to "at least as much" because
+previous-generation baselines can have odd legacy memory sizes no current-generation
+type hits exactly (e.g. c3.2xlarge's 15 GiB) — under strict equality those baselines got
+zero matches even though a strictly better, cheaper replacement existed. Any vCPU/RAM
+increase over the baseline is called out as a **flagged difference**, same as a
+network/storage/architecture change.
 _Avoid_: Equivalent, alternative, substitute
 
 **Flagged difference**:
 An attribute where the match's value differs from the baseline's, shown alongside a
-match rather than used to filter it out: network performance, EBS bandwidth/IOPS, and
-storage type (instance-store vs. EBS-only).
+match rather than used to filter it out: vCPU count or RAM when a match has more than
+the baseline (see **Match**), network performance, EBS bandwidth/IOPS, and storage type
+(instance-store vs. EBS-only).
 _Avoid_: Trade-off, side effect
 
 **Burst-capable**:

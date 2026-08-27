@@ -13,8 +13,9 @@
       <h1>EC2 Cheaper Finder</h1>
       <p class="subtitle">
         Pick a region, enter an EC2 instance type, and we'll find current-generation
-        types with the exact same vCPU &amp; RAM that cost less On-Demand in that region —
-        and flag what else changes along the way.
+        types with at least as much vCPU &amp; RAM that cost less On-Demand in that
+        region — and flag what else changes along the way, including any extra CPU/RAM
+        you're getting.
       </p>
     </header>
 
@@ -73,9 +74,10 @@
     <footer class="footer">
       <p id="data-freshness">Loading pricing data…</p>
       <p class="scope-note">
-        Scope: On-Demand pricing, current-generation candidates, exact vCPU/RAM match,
-        one region at a time. GPU, FPGA, inference/training-chip, and bare-metal instance
-        types are excluded entirely rather than compared.
+        Scope: On-Demand pricing, current-generation candidates, vCPU/RAM at least as
+        much as the baseline (never less), one region at a time. GPU, FPGA,
+        inference/training-chip, and bare-metal instance types are excluded entirely
+        rather than compared.
       </p>
     </footer>
   </div>

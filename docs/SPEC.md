@@ -10,8 +10,10 @@ marked (ADR-000x) below.
 A teammate picks a **region** (defaults to `us-east-1`) and enters a **baseline**
 instance type — current- or previous-generation, so converting an old instance to a
 modern one works too. The tool returns every **current-generation candidate** in that
-same region with the exact same vCPU count and RAM that costs less on On-Demand pricing,
-sorted cheapest first, each annotated with any **flagged differences** from the baseline.
+same region with vCPU count and RAM at least as much as the baseline's (never less) that
+costs less on On-Demand pricing, sorted cheapest first, each annotated with any
+**flagged differences** from the baseline — including any extra vCPU/RAM it has beyond
+what the baseline needs.
 
 ## Architecture (ADR-0001)
 
@@ -125,14 +127,18 @@ baseline row:
    - `instanceType` ≠ baseline's `instanceType`
    - `currentGeneration` is `true` (candidates are always current-gen, even when the
      baseline isn't)
-   - `vcpu` and `memoryGiB` exactly equal the baseline's
+   - `vcpu` >= the baseline's `vcpu`, and `memoryGiB` >= the baseline's `memoryGiB`
+     (never less, but more is fine — see CONTEXT.md's "Match" entry for why this isn't
+     exact-only)
    - `architecture` is `x86_64`, or `arm64` only if the Graviton toggle is on
    - `pricePerHour` < baseline's `pricePerHour`
 2. For each surviving row, compute:
    - `savingsPerHour = baseline.pricePerHour - candidate.pricePerHour`
    - `savingsPercent = savingsPerHour / baseline.pricePerHour * 100`
-   - flagged differences: compare `networkPerformance`, `dedicatedEbsThroughput`,
-     `storageType` against the baseline; include only the ones that differ
+   - flagged differences: compare `vcpu`, `memoryGiB`, `networkPerformance`,
+     `dedicatedEbsThroughput`, `storageType` against the baseline; include only the ones
+     that differ (a candidate with more vCPU/RAM than the baseline gets flagged the same
+     way a network/storage change does)
    - burst badge: if `burstKind` is non-null, render a prominent warning-styled badge
      (not a flagged difference) — shown for *any* burst-capable row, baseline or
      candidate, regardless of whether the baseline itself was also burst-capable
@@ -201,7 +207,6 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
 ## Explicitly out of scope for v1
 
 - Purchase options other than On-Demand (Reserved/Savings Plans/Spot)
-- "At least as much" fallback matching when no exact match exists
 - Precise (non-string) network/IOPS numbers from `DescribeInstanceTypes`
 - Cross-region comparisons (a candidate is always in the same region as its baseline)
 - Auth / access control

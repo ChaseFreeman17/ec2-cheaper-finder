@@ -139,8 +139,11 @@ function findMatches(instances, baseline, includeGraviton) {
       if (r.os !== baseline.os) return false;
       if (r.instanceType === baseline.instanceType) return false;
       if (!r.currentGeneration) return false; // candidates are always current-gen
-      if (r.vcpu !== baseline.vcpu) return false;
-      if (r.memoryGiB !== baseline.memoryGiB) return false;
+      // vCPU/RAM only need to be at least the baseline's, never less — see CONTEXT.md's
+      // "Match" entry for why (previous-gen baselines can have odd legacy memory sizes,
+      // e.g. c3.2xlarge's 15 GiB, that no current-gen type hits exactly).
+      if (r.vcpu < baseline.vcpu) return false;
+      if (r.memoryGiB < baseline.memoryGiB) return false;
       if (r.architecture === "arm64" && !includeGraviton) return false;
       if (!(r.pricePerHour < baseline.pricePerHour)) return false;
       return true;
@@ -150,6 +153,12 @@ function findMatches(instances, baseline, includeGraviton) {
 
 function flaggedDifferences(baseline, candidate) {
   const flags = [];
+  if (candidate.vcpu !== baseline.vcpu) {
+    flags.push({ label: "vCPU", text: `${baseline.vcpu} → ${candidate.vcpu}` });
+  }
+  if (candidate.memoryGiB !== baseline.memoryGiB) {
+    flags.push({ label: "RAM", text: `${baseline.memoryGiB} GiB → ${candidate.memoryGiB} GiB` });
+  }
   if (candidate.networkPerformance !== baseline.networkPerformance) {
     flags.push({
       label: "Network",
