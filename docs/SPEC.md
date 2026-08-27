@@ -1,17 +1,17 @@
 # EC2 Cheaper Finder — Spec
 
-See [`CONTEXT.md`](../CONTEXT.md) for glossary terms (**baseline**, **candidate**,
-**match**, **flagged difference**, **excluded type**, etc.) used throughout this doc, and
-[`docs/adr/`](./adr/) for the reasoning behind the three decisions marked (ADR-000x)
-below.
+See [`CONTEXT.md`](../CONTEXT.md) for glossary terms (**region**, **baseline**,
+**candidate**, **match**, **flagged difference**, **excluded type**, etc.) used
+throughout this doc, and [`docs/adr/`](./adr/) for the reasoning behind the decisions
+marked (ADR-000x) below.
 
 ## What it does
 
-A teammate enters a **baseline** instance type — current- or previous-generation, so
-converting an old instance to a modern one works too. The tool returns every
-**current-generation candidate** with the exact same vCPU count and RAM that costs less
-on On-Demand pricing in `us-east-1`, sorted cheapest first, each annotated with any
-**flagged differences** from the baseline.
+A teammate picks a **region** (defaults to `us-east-1`) and enters a **baseline**
+instance type — current- or previous-generation, so converting an old instance to a
+modern one works too. The tool returns every **current-generation candidate** in that
+same region with the exact same vCPU count and RAM that costs less on On-Demand pricing,
+sorted cheapest first, each annotated with any **flagged differences** from the baseline.
 
 ## Architecture (ADR-0001)
 
@@ -19,25 +19,36 @@ Fully static site, hosted on GitHub Pages. No backend server, no user auth.
 
 ```
 GitHub Actions (daily, scheduled + manual dispatch)
-  → fetch AWS Price List Bulk API (EC2, us-east-1)          [ADR-0002]
-  → filter to non-accelerated, non-bare-metal, On-Demand (both gens kept)
-  → trim to the fields the UI needs (see Data schema)
-  → commit data/instances.json to the repo
+  → for each of ~35 AWS regions (scripts/regions.js):     [ADR-0004]
+      fetch AWS Price List Bulk API (EC2, that region)     [ADR-0002]
+      filter to non-accelerated, non-bare-metal, On-Demand (both gens kept)
+      trim to the fields the UI needs (see Data schema)
+      write data/regions/<code>.json
+  → write data/regions/index.json (region list + freshness)
+  → commit data/regions/ to the repo
   → GitHub Pages serves the updated static site
 
 Browser
-  → loads index.html + app.js + data/instances.json
-  → user enters baseline instance type, picks OS(es)/Graviton toggle
-  → matching runs entirely client-side against instances.json
+  → loads index.html + app.js + data/regions/index.json (small, populates region picker)
+  → user picks a region → data/regions/<code>.json fetched lazily and cached in memory
+  → user enters baseline instance type (autocomplete, see UI), picks OS(es)/Graviton toggle
+  → matching runs entirely client-side against the selected region's data
 ```
 
 ## Data pipeline
 
-**Source**: AWS Price List Bulk API, `AmazonEC2` service, `us-east-1` region offer file
-(no AWS credentials required — plain HTTPS GET). (ADR-0002)
+**Source**: AWS Price List Bulk API, `AmazonEC2` service, one region-specific offer file
+per AWS region (no AWS credentials required — plain HTTPS GET). (ADR-0002)
+
+**Regions covered**: all top-level AWS regions (commercial + GovCloud), hardcoded in
+`scripts/regions.js` — not AWS Local Zones or Wavelength Zones, and not China (separate
+partition). See ADR-0004 for why per-region files and why this region list.
 
 **Refresh**: GitHub Actions workflow, `schedule: cron` daily + `workflow_dispatch` for
-manual runs.
+manual runs. Regions are fetched sequentially (not concurrently) to bound peak memory —
+each raw offer file can be several hundred MB. A single region's fetch/parse failure
+logs a warning and keeps that region's last committed file (flagged `stale` in the
+index) rather than failing the whole run.
 
 **Filtering during trim** (rows dropped entirely, never reach the site):
 - Product family indicates GPU/FPGA/inference/training accelerator, or instance type
@@ -50,21 +61,44 @@ Current- vs. previous-generation is *not* a drop condition — both are kept, ta
 `currentGeneration`, and it's enforced client-side instead (previous-gen rows are valid
 baselines, just never valid candidates — see CONTEXT.md's "Current-generation" entry).
 
-**Output**: `data/instances.json`, one row per (instance type × OS), each row roughly:
+**Output**: one file per region, `data/regions/<code>.json`, one row per (instance type ×
+OS), each row roughly:
 
 ```json
 {
-  "instanceType": "m6i.xlarge",
-  "os": "Linux" | "Windows",
-  "vcpu": 4,
-  "memoryGiB": 16,
-  "architecture": "x86_64" | "arm64",
-  "currentGeneration": true,
-  "pricePerHour": 0.192,
-  "networkPerformance": "Up to 12.5 Gigabit",
-  "dedicatedEbsThroughput": "Up to 4750 Mbps",
-  "storageType": "EBS-only" | "instance-store",
-  "burstKind": "credit" | "flex" | null
+  "generatedAt": "2026-08-27T06:17:00.000Z",
+  "region": "us-east-1",
+  "regionName": "US East (N. Virginia)",
+  "source": "AWS Price List Bulk API",
+  "instances": [
+    {
+      "instanceType": "m6i.xlarge",
+      "os": "Linux" | "Windows",
+      "vcpu": 4,
+      "memoryGiB": 16,
+      "architecture": "x86_64" | "arm64",
+      "currentGeneration": true,
+      "pricePerHour": 0.192,
+      "networkPerformance": "Up to 12.5 Gigabit",
+      "dedicatedEbsThroughput": "Up to 4750 Mbps",
+      "storageType": "EBS-only" | "instance-store",
+      "burstKind": "credit" | "flex" | null
+    }
+  ],
+  "excludedTypes": { "p3.2xlarge": "accelerated", "...": "..." }
+}
+```
+
+Plus `data/regions/index.json`, loaded first by the browser to populate the region
+picker without fetching every region's full data:
+
+```json
+{
+  "generatedAt": "2026-08-27T06:17:00.000Z",
+  "regions": [
+    { "code": "us-east-1", "name": "US East (N. Virginia)", "instanceCount": 1909, "generatedAt": "..." },
+    { "code": "il-central-1", "name": "Israel (Tel Aviv)", "instanceCount": 475, "generatedAt": "...", "stale": true }
+  ]
 }
 ```
 
@@ -81,9 +115,11 @@ directly: `architecture` is `arm64` when `physicalProcessor` contains "Graviton"
 
 ## Matching algorithm (client-side, in `app.js`)
 
-Given a validated baseline row:
+All matching happens within the currently-selected region's data (loaded lazily from
+`data/regions/<code>.json` and cached per session — see Architecture). Given a validated
+baseline row:
 
-1. Filter `instances.json` to rows where:
+1. Filter that region's `instances` to rows where:
    - `os` matches the baseline's `os` (baseline and candidates are always compared
      within the same OS — see the per-OS section note below)
    - `instanceType` ≠ baseline's `instanceType`
@@ -115,9 +151,22 @@ rather than mixing OSes in a single comparison.
 
 Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no framework).
 
-- **Instance type input**: free-text box + submit. On submit, look up the string in
-  `instances.json`; if not found (or found only as an excluded type), show an inline
-  error explaining why, no results.
+- **Region select**: a `<select>` populated from `data/regions/index.json` at load,
+  defaulting to `us-east-1`. Changing it clears any results, loads that region's data
+  (fetched once, cached in memory for the session), and rebuilds the instance-type
+  autocomplete list below. A region flagged `stale` in the index (its last refresh
+  failed and this is yesterday's data) is labeled "(data delayed)" in the dropdown.
+- **Instance type input**: a hand-rolled autocomplete combobox, not plain free text or a
+  native `<select>` — free text doesn't validate as you type, and a `<select>` listing
+  every instance type in a region (or across all regions) isn't browsable. Typing
+  filters `state.instanceTypeOptions` (deduped instance types from the current region's
+  `instances`, plus its `excludedTypes` keys so those are still discoverable) by
+  substring match, capped at 30 results; arrow keys/Enter/Escape and mouse both work.
+  Excluded types appear muted with an "excluded" tag rather than being hidden, so
+  picking one still surfaces the explanatory error instead of just not existing. On
+  submit, the typed value is looked up the same way regardless of whether it came from
+  a suggestion or was typed by hand; not found (or found only as an excluded type) shows
+  an inline error, no results.
 - **OS checkboxes**: Windows (checked by default), Linux (unchecked by default) —
   multi-select, at least one must be checked to search.
 - **Graviton toggle**: off by default.
@@ -134,8 +183,12 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
 │   ├── SPEC.md              (this file)
 │   └── adr/
 ├── .github/workflows/refresh-data.yml
-├── data/instances.json       (generated, committed by the workflow)
-├── scripts/refresh-data.*     (fetch + trim script the workflow runs)
+├── data/regions/
+│   ├── index.json            (generated, committed by the workflow)
+│   └── <region-code>.json    (generated, committed by the workflow; one per region)
+├── scripts/
+│   ├── regions.js            (hardcoded list of AWS regions to fetch)
+│   └── refresh-data.js       (fetch + trim script the workflow runs, all regions)
 ├── index.html
 ├── styles.css
 └── app.js
@@ -143,8 +196,8 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
 
 ## Explicitly out of scope for v1
 
-- Regions other than `us-east-1`
 - Purchase options other than On-Demand (Reserved/Savings Plans/Spot)
 - "At least as much" fallback matching when no exact match exists
 - Precise (non-string) network/IOPS numbers from `DescribeInstanceTypes`
+- Cross-region comparisons (a candidate is always in the same region as its baseline)
 - Auth / access control

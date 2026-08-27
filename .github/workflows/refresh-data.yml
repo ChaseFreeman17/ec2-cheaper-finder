@@ -17,6 +17,11 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    # Fetches ~35 regions' offer files sequentially (some are 300-500MB each) — see
+    # docs/adr/0004-multi-region-per-region-data-files.md. A full run has taken up to
+    # ~45 minutes; this ceiling is a generous safety margin, well under the 360-minute
+    # GitHub-hosted runner max.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -24,19 +29,19 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Fetch + trim AWS pricing data
+      - name: Fetch + trim AWS pricing data (all regions)
         run: node scripts/refresh-data.js
         env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
+          NODE_OPTIONS: "--max-old-space-size=8192 --expose-gc"
 
       - name: Commit data if it changed
         run: |
-          if git diff --quiet -- data/instances.json; then
+          if git diff --quiet -- data/regions; then
             echo "No pricing changes."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/instances.json
+          git add data/regions
           git commit -m "chore: refresh EC2 pricing data"
           git push

@@ -1,21 +1,27 @@
 #!/usr/bin/env node
-// Fetches the AWS Price List Bulk API offer file for EC2 in us-east-1, trims it down to
-// the non-accelerated, On-Demand rows the site needs, and writes data/instances.json.
-// Both current- and previous-generation rows are kept (previous-gen types are valid
-// baselines, just never valid candidates — see CONTEXT.md's "Current-generation"
-// entry). See docs/SPEC.md and docs/adr/0002-*.md for why this source and this shape.
+// Fetches the AWS Price List Bulk API offer file for EC2, once per top-level AWS region
+// (see ./regions.js), trims each down to the non-accelerated, On-Demand rows the site
+// needs, and writes one JSON file per region under data/regions/, plus a small
+// data/regions/index.json the client loads first to populate the region picker. Both
+// current- and previous-generation rows are kept per region (previous-gen types are
+// valid baselines, just never valid candidates — see CONTEXT.md's "Current-generation"
+// entry). See docs/SPEC.md and docs/adr/0002-*.md / 0004-*.md for why this source and
+// this per-region shape.
 //
 // No AWS credentials required — this hits the public pricing.*.amazonaws.com bulk JSON
-// endpoints over plain HTTPS.
+// endpoints over plain HTTPS. Each region's offer file can be several hundred MB, so this
+// script deliberately processes regions one at a time (not concurrently) to keep peak
+// memory bounded, and a single region's fetch/parse failure doesn't abort the whole run —
+// see main()'s per-region try/catch.
 
 const fs = require("fs");
 const path = require("path");
+const { REGIONS } = require("./regions");
 
-const REGION = "us-east-1";
 const REGION_INDEX_URL =
   "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/region_index.json";
 const PRICING_HOST = "https://pricing.us-east-1.amazonaws.com";
-const OUTPUT_PATH = path.join(__dirname, "..", "data", "instances.json");
+const OUTPUT_DIR = path.join(__dirname, "..", "data", "regions");
 
 // instanceFamily values that mean "this isn't a plain compute instance" — GPUs,
 // inference/training ASICs, FPGAs. Excluded from the matchable pool entirely rather
@@ -37,6 +43,19 @@ async function fetchJson(url) {
   }
   const text = await res.text();
   return JSON.parse(text);
+}
+
+async function fetchJsonWithRetry(url, attempts = 2) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetchJson(url);
+    } catch (err) {
+      lastErr = err;
+      console.warn(`  fetch failed (attempt ${i + 1}/${attempts}): ${err.message}`);
+    }
+  }
+  throw lastErr;
 }
 
 function parseMemoryGiB(memoryAttr) {
@@ -105,24 +124,18 @@ function onDemandPriceForSku(terms, sku) {
   return null;
 }
 
-async function main() {
-  console.log(`Fetching region index...`);
-  const regionIndex = await fetchJson(REGION_INDEX_URL);
-  const region = regionIndex.regions && regionIndex.regions[REGION];
-  if (!region) throw new Error(`Region ${REGION} not found in region index`);
-
-  const offerUrl = PRICING_HOST + region.currentVersionUrl;
-  console.log(`Fetching offer file: ${offerUrl}`);
-  const offer = await fetchJson(offerUrl);
-
+// Trims one region's raw offer file down to the rows/exclusions the site needs. Pulled
+// out of the fetch step so main()'s per-region loop can retry/skip on fetch failure
+// without duplicating this logic.
+function trimOfferProducts(offer) {
   const products = offer.products || {};
   const terms = offer.terms || {};
 
   const rows = new Map(); // key: `${instanceType}|${os}` -> row
-  // Instance types that exist in AWS's data but are deliberately left out of `rows`,
-  // so the UI can explain *why* a lookup came back empty instead of just saying
-  // "not found". Reason wins the first time we see that instance type; later SKUs for
-  // the same type (different OS, etc.) don't overwrite it.
+  // Instance types that exist in AWS's data but are deliberately left out of `rows`, so
+  // the UI can explain *why* a lookup came back empty instead of just saying "not
+  // found". Reason wins the first time we see that instance type; later SKUs for the
+  // same type (different OS, etc.) don't overwrite it.
   const excludedTypes = new Map(); // instanceType -> reason
   let seen = 0;
   let excluded = 0;
@@ -190,29 +203,102 @@ async function main() {
     excludedTypes.delete(row.instanceType);
   }
 
-  const output = {
-    generatedAt: new Date().toISOString(),
-    region: REGION,
-    source: "AWS Price List Bulk API",
-    instances: [...rows.values()].sort((a, b) =>
-      a.instanceType === b.instanceType ? a.os.localeCompare(b.os) : a.instanceType.localeCompare(b.instanceType)
-    ),
-    excludedTypes: Object.fromEntries(
-      [...excludedTypes.entries()].sort(([a], [b]) => a.localeCompare(b))
-    ),
-  };
+  const instances = [...rows.values()].sort((a, b) =>
+    a.instanceType === b.instanceType ? a.os.localeCompare(b.os) : a.instanceType.localeCompare(b.instanceType)
+  );
+  const excludedTypesObj = Object.fromEntries(
+    [...excludedTypes.entries()].sort(([a], [b]) => a.localeCompare(b))
+  );
 
-  fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
-  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output));
-
-  console.log(`Products seen: ${seen}`);
-  console.log(`Excluded (accelerator/bare-metal/non-instance): ${excluded}`);
-  console.log(`Filtered out (gen/tenancy/license/os/etc): ${filteredOut}`);
-  console.log(`No on-demand price found: ${noPrice}`);
-  console.log(`Rows written: ${output.instances.length} -> ${OUTPUT_PATH}`);
+  return { instances, excludedTypes: excludedTypesObj, seen, excluded, filteredOut, noPrice };
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+async function main() {
+  console.log("Fetching region index...");
+  const regionIndex = await fetchJsonWithRetry(REGION_INDEX_URL);
+
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+  const summary = [];
+
+  for (const { code, name } of REGIONS) {
+    const meta = regionIndex.regions && regionIndex.regions[code];
+    if (!meta) {
+      console.warn(`[${code}] skipping: not present in AWS's region index (may have been retired).`);
+      continue;
+    }
+
+    const outPath = path.join(OUTPUT_DIR, `${code}.json`);
+    const offerUrl = PRICING_HOST + meta.currentVersionUrl;
+    console.log(`[${code}] fetching offer file...`);
+
+    try {
+      const offer = await fetchJsonWithRetry(offerUrl);
+      const { instances, excludedTypes, seen, excluded, filteredOut, noPrice } =
+        trimOfferProducts(offer);
+      const generatedAt = new Date().toISOString();
+
+      const output = {
+        generatedAt,
+        region: code,
+        regionName: name,
+        source: "AWS Price List Bulk API",
+        instances,
+        excludedTypes,
+      };
+
+      fs.writeFileSync(outPath, JSON.stringify(output));
+      console.log(
+        `[${code}] rows: ${instances.length} (seen ${seen}, excluded ${excluded}, filtered ${filteredOut}, no-price ${noPrice})`
+      );
+      summary.push({ code, name, instanceCount: instances.length, generatedAt });
+    } catch (err) {
+      console.error(`[${code}] FAILED: ${err.message}`);
+      // A transient failure for one region shouldn't nuke that region's last-known-good
+      // data or fail the whole run — keep whatever was committed before and flag it stale.
+      if (fs.existsSync(outPath)) {
+        try {
+          const prev = JSON.parse(fs.readFileSync(outPath, "utf8"));
+          summary.push({
+            code,
+            name,
+            instanceCount: prev.instances.length,
+            generatedAt: prev.generatedAt,
+            stale: true,
+          });
+          console.warn(`[${code}] keeping previous data from ${prev.generatedAt}`);
+        } catch {
+          summary.push({ code, name, instanceCount: 0, generatedAt: null, failed: true });
+        }
+      } else {
+        summary.push({ code, name, instanceCount: 0, generatedAt: null, failed: true });
+      }
+    }
+
+    // These offer files are large (up to ~500MB parsed); encourage V8 to reclaim that
+    // memory between regions rather than letting peak usage climb across the loop.
+    // (No-op unless run with --expose-gc, which the workflow sets.)
+    if (global.gc) global.gc();
+  }
+
+  summary.sort((a, b) => a.code.localeCompare(b.code));
+  fs.writeFileSync(
+    path.join(OUTPUT_DIR, "index.json"),
+    JSON.stringify({ generatedAt: new Date().toISOString(), regions: summary })
+  );
+
+  const okCount = summary.filter((r) => !r.failed).length;
+  console.log(`Done. ${okCount}/${summary.length} regions have usable data.`);
+  if (okCount === 0) {
+    throw new Error("Every region failed to refresh — aborting so a bad run doesn't get committed as if it succeeded.");
+  }
+}
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = { trimOfferProducts, fetchJsonWithRetry, main };

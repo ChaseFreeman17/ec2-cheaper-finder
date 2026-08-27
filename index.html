@@ -12,23 +12,36 @@
     <header class="hero">
       <h1>EC2 Cheaper Finder</h1>
       <p class="subtitle">
-        Enter an EC2 instance type. We'll find current-generation types with the exact
-        same vCPU &amp; RAM that cost less On-Demand in <strong>us-east-1</strong> —
+        Pick a region, enter an EC2 instance type, and we'll find current-generation
+        types with the exact same vCPU &amp; RAM that cost less On-Demand in that region —
         and flag what else changes along the way.
       </p>
     </header>
 
     <main>
       <form id="search-form" class="search-card" autocomplete="off">
+        <div class="field field-region">
+          <label for="region-select">Region</label>
+          <select id="region-select"></select>
+        </div>
+
         <div class="field field-instance">
           <label for="instance-type">Baseline instance type</label>
-          <input
-            id="instance-type"
-            name="instance-type"
-            type="text"
-            placeholder="e.g. m5.xlarge"
-            spellcheck="false"
-          />
+          <div class="combobox">
+            <input
+              id="instance-type"
+              name="instance-type"
+              type="text"
+              role="combobox"
+              aria-expanded="false"
+              aria-controls="instance-type-list"
+              aria-autocomplete="list"
+              autocomplete="off"
+              placeholder="e.g. m5.xlarge"
+              spellcheck="false"
+            />
+            <ul id="instance-type-list" class="combobox-list" role="listbox" hidden></ul>
+          </div>
         </div>
 
         <fieldset class="field field-os">
@@ -60,9 +73,9 @@
     <footer class="footer">
       <p id="data-freshness">Loading pricing data…</p>
       <p class="scope-note">
-        Scope: On-Demand, us-east-1, current-generation only, exact vCPU/RAM match.
-        GPU, FPGA, inference/training-chip, and bare-metal instance types are excluded
-        entirely rather than compared.
+        Scope: On-Demand pricing, current-generation candidates, exact vCPU/RAM match,
+        one region at a time. GPU, FPGA, inference/training-chip, and bare-metal instance
+        types are excluded entirely rather than compared.
       </p>
     </footer>
   </div>

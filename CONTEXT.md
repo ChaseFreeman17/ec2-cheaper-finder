@@ -1,10 +1,19 @@
 # EC2 Cheaper Finder
 
-A static web tool: given a baseline EC2 instance type, find current-generation instance
-types with the exact same vCPU count and RAM that cost less on On-Demand pricing, while
-surfacing (not filtering on) other characteristics that also changed.
+A static web tool: given a baseline EC2 instance type in a chosen AWS region, find
+current-generation instance types with the exact same vCPU count and RAM that cost less
+on On-Demand pricing in that same region, while surfacing (not filtering on) other
+characteristics that also changed.
 
 ## Language
+
+**Region**:
+The single AWS region (e.g. `us-east-1`) a search is scoped to, picked from a dropdown
+that defaults to `us-east-1`. A **baseline** and its **candidates** are always compared
+within the same region — pricing, and even which instance types exist at all, differs by
+region, so there's no cross-region matching. Local Zones and Wavelength Zones (e.g.
+`us-east-1-bos-1`) aren't offered as regions; see ADR-0004.
+_Avoid_: Location, datacenter
 
 **Baseline**:
 The EC2 instance type the user enters to compare from.
