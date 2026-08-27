@@ -36,6 +36,8 @@ const KNOWN_NAMES = {
   "ap-southeast-3": "Asia Pacific (Jakarta)",
   "ap-southeast-4": "Asia Pacific (Melbourne)",
   "ap-southeast-5": "Asia Pacific (Malaysia)",
+  "ap-southeast-6": "Asia Pacific (New Zealand)",
+  "ap-southeast-7": "Asia Pacific (Thailand)",
   "ca-central-1": "Canada (Central)",
   "ca-west-1": "Canada West (Calgary)",
   "eu-central-1": "Europe (Frankfurt)",

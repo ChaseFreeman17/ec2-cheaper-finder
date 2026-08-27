@@ -92,8 +92,10 @@ function pickDefaultRegion(regionsIndex) {
 
 function populateRegionSelect(regionsIndex) {
   els.regionSelect.innerHTML = "";
-  for (const r of regionsIndex.regions) {
-    if (r.failed) continue; // never had usable data — nothing to offer
+  const sorted = regionsIndex.regions
+    .filter((r) => !r.failed) // never had usable data — nothing to offer
+    .sort((a, b) => a.name.localeCompare(b.name));
+  for (const r of sorted) {
     const label = r.stale ? `${r.name} (data delayed)` : r.name;
     els.regionSelect.appendChild(el("option", { value: r.code, text: label }));
   }
