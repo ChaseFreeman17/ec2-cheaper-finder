@@ -36,8 +36,10 @@ matchable pool entirely rather than surfaced as a difference.
 _Avoid_: Filtered instance, unsupported instance
 
 **Current-generation**:
-An instance type AWS marks as current-generation (not scheduled for phase-out). Only
-current-generation types are ever offered as candidates.
+An instance type AWS marks as current-generation (not scheduled for phase-out). A
+**candidate** must always be current-generation. A previous-generation type may still be
+used as a **baseline** — converting an old instance to a modern one is the point — it
+just never appears as a match itself.
 _Avoid_: Modern, latest, non-legacy
 
 **Graviton toggle**:

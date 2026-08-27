@@ -8,8 +8,6 @@ const EXCLUSION_MESSAGES = {
     "it's a bare-metal instance type, which gives direct hardware access that a regular instance can't replicate — so it's left out of comparisons entirely.",
   "not-a-standard-instance":
     "it isn't a standard compute instance type (e.g. a dedicated host or another non-instance line item).",
-  "previous-generation":
-    "it's a previous-generation instance type. This tool only recommends current-generation types.",
 };
 
 const state = {
@@ -64,6 +62,7 @@ function findMatches(instances, baseline, includeGraviton) {
     .filter((r) => {
       if (r.os !== baseline.os) return false;
       if (r.instanceType === baseline.instanceType) return false;
+      if (!r.currentGeneration) return false; // candidates are always current-gen
       if (r.vcpu !== baseline.vcpu) return false;
       if (r.memoryGiB !== baseline.memoryGiB) return false;
       if (r.architecture === "arm64" && !includeGraviton) return false;
@@ -128,18 +127,34 @@ function el(tag, attrs, children) {
 }
 
 function renderBaselineCard(baseline) {
-  return el("div", { class: "baseline-card" }, [
-    el("div", { class: "baseline-title" }, [
-      el("strong", { text: baseline.instanceType }),
-      el("span", { class: "pill", text: baseline.os }),
-      el("span", { class: "pill pill-muted", text: baseline.architecture }),
-    ]),
+  const titleParts = [
+    el("strong", { text: baseline.instanceType }),
+    el("span", { class: "pill", text: baseline.os }),
+    el("span", { class: "pill pill-muted", text: baseline.architecture }),
+  ];
+  if (!baseline.currentGeneration) {
+    titleParts.push(el("span", { class: "pill pill-muted", text: "Previous-gen" }));
+  }
+
+  const card = el("div", { class: "baseline-card" }, [
+    el("div", { class: "baseline-title" }, titleParts),
     el("div", { class: "baseline-specs" }, [
       el("span", { text: `${baseline.vcpu} vCPU` }),
       el("span", { text: `${baseline.memoryGiB} GiB RAM` }),
       el("span", { text: formatMoney(baseline.pricePerHour) }),
     ]),
   ]);
+
+  if (!baseline.currentGeneration) {
+    card.appendChild(
+      el("p", {
+        class: "prev-gen-note",
+        text: "This is a previous-generation instance type — results below are current-generation replacements.",
+      })
+    );
+  }
+
+  return card;
 }
 
 function renderResultsTable(baseline, matches) {

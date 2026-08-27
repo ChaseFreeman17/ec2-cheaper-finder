@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Fetches the AWS Price List Bulk API offer file for EC2 in us-east-1, trims it down to
-// the current-generation, non-accelerated, On-Demand rows the site needs, and writes
-// data/instances.json. See docs/SPEC.md and docs/adr/0002-*.md for why this source and
-// this shape.
+// the non-accelerated, On-Demand rows the site needs, and writes data/instances.json.
+// Both current- and previous-generation rows are kept (previous-gen types are valid
+// baselines, just never valid candidates — see CONTEXT.md's "Current-generation"
+// entry). See docs/SPEC.md and docs/adr/0002-*.md for why this source and this shape.
 //
 // No AWS credentials required — this hits the public pricing.*.amazonaws.com bulk JSON
 // endpoints over plain HTTPS.
@@ -64,8 +65,11 @@ function exclusionReason(product) {
 }
 
 function passesOnDemandFilters(attrs) {
+  // Deliberately no currentGeneration check here: previous-generation types are still
+  // valid *baselines* (finding a modern replacement for an old instance is the point),
+  // just never valid *candidates* — that's enforced client-side in app.js using the
+  // `currentGeneration` flag on each row.
   return (
-    attrs.currentGeneration === "Yes" &&
     attrs.tenancy === "Shared" &&
     attrs.capacitystatus === "Used" &&
     attrs.preInstalledSw === "NA" &&
@@ -130,10 +134,6 @@ async function main() {
       continue;
     }
 
-    if (instanceType && attrs.currentGeneration === "No" && !excludedTypes.has(instanceType)) {
-      excludedTypes.set(instanceType, "previous-generation");
-    }
-
     if (!passesOnDemandFilters(attrs)) {
       filteredOut++;
       continue;
@@ -151,6 +151,7 @@ async function main() {
       vcpu: parseInt(attrs.vcpu, 10),
       memoryGiB: parseMemoryGiB(attrs.memory),
       architecture: architectureOf(attrs.physicalProcessor),
+      currentGeneration: attrs.currentGeneration === "Yes",
       pricePerHour: price,
       networkPerformance: attrs.networkPerformance || "Unknown",
       dedicatedEbsThroughput:
@@ -173,9 +174,8 @@ async function main() {
   }
 
   // An instance type only counts as "excluded" for messaging purposes if it never made
-  // it into `rows` at all (e.g. a GPU type never has a qualifying row; a previous-gen
-  // type might still slip in if our currentGeneration read was wrong for one SKU but
-  // not another — favor showing real rows over an exclusion message).
+  // it into `rows` at all (belt-and-suspenders: favor showing a real row over an
+  // exclusion message if a type somehow ended up in both).
   for (const row of rows.values()) {
     excludedTypes.delete(row.instanceType);
   }

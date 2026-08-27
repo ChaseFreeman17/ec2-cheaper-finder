@@ -257,6 +257,13 @@ body {
   margin-bottom: 8px;
 }
 
+.prev-gen-note {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .baseline-specs {
   display: flex;
   gap: 18px;

@@ -7,10 +7,11 @@ below.
 
 ## What it does
 
-A teammate enters a **baseline** instance type. The tool returns every current-generation
-**candidate** with the exact same vCPU count and RAM that costs less on On-Demand
-pricing in `us-east-1`, sorted cheapest first, each annotated with any **flagged
-differences** from the baseline.
+A teammate enters a **baseline** instance type — current- or previous-generation, so
+converting an old instance to a modern one works too. The tool returns every
+**current-generation candidate** with the exact same vCPU count and RAM that costs less
+on On-Demand pricing in `us-east-1`, sorted cheapest first, each annotated with any
+**flagged differences** from the baseline.
 
 ## Architecture (ADR-0001)
 
@@ -19,7 +20,7 @@ Fully static site, hosted on GitHub Pages. No backend server, no user auth.
 ```
 GitHub Actions (daily, scheduled + manual dispatch)
   → fetch AWS Price List Bulk API (EC2, us-east-1)          [ADR-0002]
-  → filter to current-generation, non-accelerated, non-bare-metal, On-Demand
+  → filter to non-accelerated, non-bare-metal, On-Demand (both gens kept)
   → trim to the fields the UI needs (see Data schema)
   → commit data/instances.json to the repo
   → GitHub Pages serves the updated static site
@@ -39,11 +40,15 @@ Browser
 manual runs.
 
 **Filtering during trim** (rows dropped entirely, never reach the site):
-- Not `currentGeneration: Yes` → dropped
 - Product family indicates GPU/FPGA/inference/training accelerator, or instance type
-  ends in `.metal` → dropped (ADR-0003)
+  ends in `.metal`, or isn't a standard compute instance line item → dropped (ADR-0003)
 - Purchase option other than On-Demand → dropped
 - Tenancy other than Shared/default → dropped (avoids duplicate rows per instance type)
+- OS other than Linux/Windows → dropped
+
+Current- vs. previous-generation is *not* a drop condition — both are kept, tagged with
+`currentGeneration`, and it's enforced client-side instead (previous-gen rows are valid
+baselines, just never valid candidates — see CONTEXT.md's "Current-generation" entry).
 
 **Output**: `data/instances.json`, one row per (instance type × OS), each row roughly:
 
@@ -54,6 +59,7 @@ manual runs.
   "vcpu": 4,
   "memoryGiB": 16,
   "architecture": "x86_64" | "arm64",
+  "currentGeneration": true,
   "pricePerHour": 0.192,
   "networkPerformance": "Up to 12.5 Gigabit",
   "dedicatedEbsThroughput": "Up to 4750 Mbps",
@@ -62,31 +68,44 @@ manual runs.
 }
 ```
 
-Exact field names/availability to be confirmed against a real sample of the bulk JSON
-during implementation — `architecture` and `burstable` in particular may need to be
-derived (e.g. `burstable` = instance-type prefix is `t*`; `architecture` from the
-`physicalProcessor`/instance-family naming) rather than read directly off a single
-attribute.
+Field names confirmed against a real sample of the bulk JSON (`scripts/refresh-data.js`
+reads `attributes.instanceType`, `.vcpu`, `.memory`, `.currentGeneration`,
+`.networkPerformance`, `.dedicatedEbsThroughput`/`.dedicatedEbsThroughputDescription`,
+`.storage`, `.physicalProcessor`, `.instanceFamily`, `.productFamily`, `.tenancy`,
+`.capacitystatus`, `.preInstalledSw`, `.licenseModel`, `.marketoption`,
+`.operatingSystem`). `architecture` and `burstable` are derived rather than read
+directly: `architecture` is `arm64` when `physicalProcessor` contains "Graviton", else
+`x86_64`; `burstable` is true when the instance-type family prefix matches `t\d` (e.g.
+`t3`, `t4g`).
 
 ## Matching algorithm (client-side, in `app.js`)
 
 Given a validated baseline row:
 
 1. Filter `instances.json` to rows where:
+   - `os` matches the baseline's `os` (baseline and candidates are always compared
+     within the same OS — see the per-OS section note below)
+   - `instanceType` ≠ baseline's `instanceType`
+   - `currentGeneration` is `true` (candidates are always current-gen, even when the
+     baseline isn't)
    - `vcpu` and `memoryGiB` exactly equal the baseline's
-   - `os` is one of the checked OS boxes
    - `architecture` is `x86_64`, or `arm64` only if the Graviton toggle is on
    - `pricePerHour` < baseline's `pricePerHour`
-   - `instanceType` ≠ baseline's `instanceType`
 2. For each surviving row, compute:
    - `savingsPerHour = baseline.pricePerHour - candidate.pricePerHour`
    - `savingsPercent = savingsPerHour / baseline.pricePerHour * 100`
    - flagged differences: compare `networkPerformance`, `dedicatedEbsThroughput`,
      `storageType`, `burstable` against the baseline; include only the ones that differ
 3. Sort by `pricePerHour` ascending.
-4. If the baseline itself was excluded from the dataset (accelerated/bare-metal/
-   previous-gen), show an explanatory message instead of running a search.
+4. If the baseline itself was excluded from the dataset entirely (accelerated/
+   bare-metal/not-a-standard-instance, per ADR-0003), show an explanatory message
+   instead of running a search. If the baseline is previous-generation, it's still
+   searched normally — just noted as previous-gen above its results.
 5. If no candidates survive step 1, show "No cheaper equivalent found."
+
+Since price (and OS availability) differs by operating system, the baseline is looked
+up per checked OS box independently (one baseline row + result table per checked OS),
+rather than mixing OSes in a single comparison.
 
 ## UI
 
