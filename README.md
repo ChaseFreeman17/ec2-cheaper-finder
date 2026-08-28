@@ -21,6 +21,12 @@ Then open the printed local URL. `data/regions/` is already checked into the rep
 JSON file per AWS region, refreshed daily by CI), so it works without fetching anything
 from AWS yourself.
 
+## Analytics
+
+The live site loads [Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/)
+(`index.html`'s closing `<script>` tag) to track page views — it's cookieless and collects
+no personal data. The site token there is a public client-side identifier, not a secret.
+
 ## Refreshing the pricing data manually
 
 ```sh
