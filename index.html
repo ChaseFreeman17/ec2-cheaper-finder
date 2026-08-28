@@ -121,7 +121,10 @@
   </div>
 
   <script src="app.js?v=4"></script>
-  <!-- Cloudflare Web Analytics: cookieless, no PII — https://developers.cloudflare.com/web-analytics/ -->
-  <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "44fde38d907347458c0f7ed9e0d30424"}'></script>
+  <!-- Cloudflare Web Analytics: cookieless, no PII — https://developers.cloudflare.com/web-analytics/
+       Classic script (not type="module") deliberately: module scripts are always
+       CORS-checked by spec, a plain <script src> isn't — one less way for this to fail
+       for browsers that don't already block the domain outright (see README). -->
+  <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "44fde38d907347458c0f7ed9e0d30424"}'></script>
 </body>
 </html>

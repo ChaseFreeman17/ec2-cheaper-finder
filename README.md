@@ -27,6 +27,13 @@ The live site loads [Cloudflare Web Analytics](https://developers.cloudflare.com
 (`index.html`'s closing `<script>` tag) to track page views — it's cookieless and collects
 no personal data. The site token there is a public client-side identifier, not a secret.
 
+Some visitors' traffic won't be counted: `static.cloudflareinsights.com` is on several
+ad-blocker/tracking-protection blocklists (EasyPrivacy, Disconnect), so Firefox Enhanced
+Tracking Protection and ad-blocker extensions commonly block the beacon request outright
+(shows as a CORS-looking console error, but it's really the request never reaching the
+network). This is expected and true of any client-side analytics — traffic counts here
+are a lower bound, not exact.
+
 ## Refreshing the pricing data manually
 
 ```sh
