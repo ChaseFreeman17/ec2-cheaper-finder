@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EC2 Undercut</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
   <div class="page">
@@ -27,8 +27,11 @@
         </div>
 
         <div class="field field-instance">
-          <label for="instance-type">Baseline instance type</label>
-          <div class="combobox">
+          <div class="field-instance-header">
+            <label for="instance-type">Baseline instance type</label>
+            <button type="button" id="mode-toggle" class="mode-toggle-link">Switch to bulk lookup</button>
+          </div>
+          <div class="combobox" id="single-mode-field">
             <input
               id="instance-type"
               name="instance-type"
@@ -43,6 +46,13 @@
             />
             <ul id="instance-type-list" class="combobox-list" role="listbox" hidden></ul>
           </div>
+          <textarea
+            id="bulk-instance-types"
+            class="bulk-textarea"
+            placeholder="One instance type per line (or comma-separated), e.g.&#10;m5.xlarge&#10;c5.2xlarge&#10;r5.large"
+            spellcheck="false"
+            hidden
+          ></textarea>
         </div>
 
         <fieldset class="field field-os">
@@ -74,7 +84,7 @@
           </label>
         </div>
 
-        <button type="submit" class="submit-btn">Find cheaper equivalents</button>
+        <button type="submit" id="submit-btn" class="submit-btn">Find cheaper equivalents</button>
       </form>
 
       <div id="status" class="status" role="status" aria-live="polite"></div>
@@ -93,6 +103,6 @@
     </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

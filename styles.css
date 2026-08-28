@@ -126,6 +126,49 @@ body {
   position: relative;
 }
 
+.field-instance-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.mode-toggle-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mode-toggle-link:hover {
+  opacity: 0.85;
+}
+
+.bulk-textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  font-size: 0.95rem;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.bulk-textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .field-instance input {
   width: 100%;
   font-size: 1.05rem;
@@ -492,6 +535,34 @@ body {
   color: var(--text-muted);
   font-style: italic;
   padding: 8px 0;
+}
+
+.bulk-table .no-diff {
+  font-style: italic;
+}
+
+.bulk-row-note td {
+  color: var(--text-muted);
+}
+
+.bulk-more {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.bulk-details-btn {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.bulk-details-btn:hover {
+  background: var(--border);
 }
 
 .footer {

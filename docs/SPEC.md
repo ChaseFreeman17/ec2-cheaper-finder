@@ -13,7 +13,9 @@ modern one works too. The tool returns every **current-generation candidate** in
 same region with vCPU count and RAM at least as much as the baseline's (never less) that
 costs less on On-Demand pricing, sorted cheapest first, each annotated with any
 **flagged differences** from the baseline — including any extra vCPU/RAM it has beyond
-what the baseline needs.
+what the baseline needs. A bulk mode runs the same lookup for a whole pasted list of
+instance types at once (e.g. auditing a fleet), and every search's URL is shareable —
+loading it re-runs the same search (see UI below).
 
 ## Architecture (ADR-0001)
 
@@ -189,6 +191,24 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
 - **Results table**, sorted cheapest first, columns: instance type, price/hr, savings
   ($/hr and %), flagged differences (as small inline badges/tags, only shown when
   present for that row).
+- **Bulk lookup mode**: a "Switch to bulk lookup" link next to the instance-type label
+  swaps the combobox for a textarea (one instance type per line, or comma-separated).
+  Submitting runs the *same* matching logic once per (instance type × selected OS) pair
+  and renders one condensed summary row each — instance type, OS, price, cheapest match,
+  savings, and a "Details" button — rather than the full baseline-card-plus-table
+  treatment used in single mode, which doesn't scale past a handful of types. A type
+  that's unrecognized or excluded gets a one-line explanatory row instead of being
+  silently skipped. Capped at 300 unique entries per submission (a soft ceiling against
+  a pathological paste, not a realistic fleet size). "Details" jumps back to single mode
+  pre-filled with that exact type/OS for the full breakdown.
+- **Shareable URLs**: every search (region, mode, instance type(s), OS, Graviton/
+  burstable toggles) is reflected in the URL query string on submit — `?region=...` plus
+  either `&type=...` (single mode) or `&mode=bulk&types=...` (bulk mode, comma-joined).
+  Loading a URL with these params re-runs that exact search automatically, so a result
+  can be bookmarked or sent to a teammate. Manual submits push a new history entry
+  (so back/forward step through past searches in a session); the initial URL-driven
+  load and browser back/forward both replay via the same `applyUrlParams` path rather
+  than pushing new entries.
 
 ## Repo layout
 

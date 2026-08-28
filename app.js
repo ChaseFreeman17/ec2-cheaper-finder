@@ -33,12 +33,14 @@ const BURST_KIND_INFO = {
 
 const DEFAULT_REGION = "us-east-1";
 const MAX_COMBOBOX_RESULTS = 30;
+const MAX_BULK_TYPES = 300; // soft cap so a pathological paste can't freeze the tab
 
 const state = {
   regionsIndex: null, // { generatedAt, regions: [{code, name, instanceCount, generatedAt, stale?, failed?}] }
   regionCache: new Map(), // code -> { generatedAt, region, regionName, source, instances, excludedTypes }
   currentRegion: null,
   instanceTypeOptions: [], // [{ type, excluded: reason|null }], for the current region
+  mode: "single", // "single" | "bulk" — see setMode()
 };
 
 const combo = {
@@ -58,6 +60,10 @@ function cacheEls() {
   els.regionSelect = byId("region-select");
   els.input = byId("instance-type");
   els.comboList = byId("instance-type-list");
+  els.singleModeField = byId("single-mode-field");
+  els.bulkTextarea = byId("bulk-instance-types");
+  els.modeToggle = byId("mode-toggle");
+  els.submitBtn = byId("submit-btn");
   els.osWindows = byId("os-windows");
   els.osLinux = byId("os-linux");
   els.burstable = byId("burstable-toggle");
@@ -478,15 +484,250 @@ async function setRegion(code) {
   }
 }
 
+// ---- Mode switching (single lookup vs. bulk lookup) ---------------------------------
+
+function setMode(mode) {
+  state.mode = mode;
+  const isBulk = mode === "bulk";
+  els.singleModeField.hidden = isBulk;
+  els.bulkTextarea.hidden = !isBulk;
+  els.modeToggle.textContent = isBulk ? "Switch to single lookup" : "Switch to bulk lookup";
+  els.submitBtn.textContent = isBulk ? "Find cheaper equivalents for all" : "Find cheaper equivalents";
+  clearResults();
+  showStatus("", "");
+}
+
+// ---- Bulk lookup ----------------------------------------------------------------------
+// Same matching logic as single lookup, run once per (instance type × selected OS) pair,
+// condensed into one summary row each rather than the full baseline-card + table
+// treatment (which doesn't scale to dozens of types). Click "Details" on any row to jump
+// back to single mode with the full breakdown for that exact type/OS.
+
+function parseBulkInput(text) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of text.split(/[\n,]/)) {
+    const t = raw.trim();
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+  }
+  return out;
+}
+
+function runBulkLookup(types, osSelections, instances, excludedTypes, includeGraviton, includeBurstable) {
+  const rows = [];
+  for (const inputType of types) {
+    if (!anyRowMatchesType(instances, inputType)) {
+      const reason = findExcludedReason(excludedTypes, inputType);
+      rows.push({ inputType, kind: reason ? "excluded" : "not-found", reason });
+      continue;
+    }
+    for (const os of osSelections) {
+      const baseline = findBaselineRow(instances, inputType, os);
+      if (!baseline) {
+        rows.push({ inputType, os, kind: "no-os" });
+        continue;
+      }
+      const matches = findMatches(instances, baseline, includeGraviton, includeBurstable);
+      if (matches.length === 0) {
+        rows.push({ inputType, os, kind: "no-match", baseline });
+      } else {
+        rows.push({ inputType, os, kind: "match", baseline, best: matches[0], matchCount: matches.length });
+      }
+    }
+  }
+  return rows;
+}
+
+function viewDetails(instanceType, os) {
+  setMode("single");
+  els.input.value = instanceType;
+  els.osWindows.checked = os === "Windows";
+  els.osLinux.checked = os === "Linux";
+  runSearch(true);
+  els.form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderBulkTable(rows) {
+  if (rows.length === 0) {
+    return el("p", { class: "empty-note", text: "Enter at least one instance type, one per line." });
+  }
+
+  const table = el("table", { class: "results-table bulk-table" }, []);
+  const thead = el("thead", null, [
+    el("tr", null, [
+      el("th", { text: "Instance type" }),
+      el("th", { text: "OS" }),
+      el("th", { text: "Price" }),
+      el("th", { text: "Best match" }),
+      el("th", { text: "Savings" }),
+      el("th", { text: "" }),
+    ]),
+  ]);
+  const tbody = el("tbody", null, []);
+
+  for (const row of rows) {
+    if (row.kind === "not-found" || row.kind === "excluded") {
+      const msg =
+        row.kind === "excluded"
+          ? `Excluded — ${EXCLUSION_MESSAGES[row.reason] || "outside this tool's scope"}`
+          : "Not recognized in this region";
+      tbody.appendChild(
+        el("tr", { class: "bulk-row-note" }, [
+          el("td", { text: row.inputType }),
+          el("td", { colspan: "5", class: "no-diff", text: msg }),
+        ])
+      );
+      continue;
+    }
+    if (row.kind === "no-os") {
+      tbody.appendChild(
+        el("tr", { class: "bulk-row-note" }, [
+          el("td", { text: row.inputType }),
+          el("td", { text: row.os }),
+          el("td", { colspan: "4", class: "no-diff", text: `No ${row.os} pricing found` }),
+        ])
+      );
+      continue;
+    }
+    if (row.kind === "no-match") {
+      tbody.appendChild(
+        el("tr", { class: "bulk-row-note" }, [
+          el("td", { text: row.baseline.instanceType }),
+          el("td", { text: row.os }),
+          el("td", { text: formatMoney(row.baseline.pricePerHour) }),
+          el("td", { colspan: "3", class: "no-diff", text: "No cheaper equivalent found" }),
+        ])
+      );
+      continue;
+    }
+
+    // row.kind === "match"
+    const { baseline, best, matchCount } = row;
+    const savingsPerHour = baseline.pricePerHour - best.pricePerHour;
+    const savingsPercent = (savingsPerHour / baseline.pricePerHour) * 100;
+
+    const matchCell = el("td", null, [
+      el("strong", { text: best.instanceType }),
+      el("span", { class: "pill pill-muted small", text: best.architecture }),
+    ]);
+    const burstBadge = renderBurstBadge(best);
+    if (burstBadge) matchCell.appendChild(burstBadge);
+    if (matchCount > 1) {
+      matchCell.appendChild(el("span", { class: "bulk-more", text: `+${matchCount - 1} more option${matchCount - 1 === 1 ? "" : "s"}` }));
+    }
+
+    const detailsBtn = el("button", { type: "button", class: "bulk-details-btn" }, ["Details"]);
+    detailsBtn.addEventListener("click", () => viewDetails(baseline.instanceType, row.os));
+
+    tbody.appendChild(
+      el("tr", { class: best.burstKind ? "burst-row" : "" }, [
+        el("td", { text: baseline.instanceType }),
+        el("td", { text: row.os }),
+        el("td", { text: formatMoney(baseline.pricePerHour) }),
+        matchCell,
+        el("td", { class: "savings" }, [
+          el("span", { class: "savings-abs", text: `-${formatMoney(savingsPerHour)}` }),
+          el("span", { class: "savings-pct", text: `-${savingsPercent.toFixed(0)}%` }),
+        ]),
+        el("td", null, [detailsBtn]),
+      ])
+    );
+  }
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  return table;
+}
+
+// ---- Shareable URLs -------------------------------------------------------------------
+// The current search (region, mode, instance type(s), OS, toggles) is reflected in the
+// URL query string so a search can be bookmarked or sent to a teammate. Read once at
+// startup and on browser back/forward; written on every search submit.
+
+function buildSearchParams() {
+  const params = new URLSearchParams();
+  if (state.currentRegion) params.set("region", state.currentRegion);
+
+  const osList = [];
+  if (els.osWindows.checked) osList.push("windows");
+  if (els.osLinux.checked) osList.push("linux");
+  if (osList.length) params.set("os", osList.join(","));
+
+  if (els.graviton.checked) params.set("graviton", "1");
+  if (!els.burstable.checked) params.set("burstable", "0");
+
+  if (state.mode === "bulk") {
+    params.set("mode", "bulk");
+    const types = parseBulkInput(els.bulkTextarea.value);
+    if (types.length) params.set("types", types.join(","));
+  } else {
+    const instanceType = els.input.value.trim();
+    if (instanceType) params.set("type", instanceType);
+  }
+  return params;
+}
+
+function updateUrl(push) {
+  const params = buildSearchParams();
+  const query = params.toString();
+  const newUrl = query ? `${location.pathname}?${query}` : location.pathname;
+  if (push) history.pushState(null, "", newUrl);
+  else history.replaceState(null, "", newUrl);
+}
+
+function parseUrlParams() {
+  const params = new URLSearchParams(location.search);
+  const osParam = params.get("os");
+  const typesParam = params.get("types");
+  const burstableParam = params.get("burstable");
+  return {
+    region: params.get("region"),
+    mode: params.get("mode") === "bulk" ? "bulk" : "single",
+    type: params.get("type") || "",
+    types: typesParam ? typesParam.split(",").map((s) => s.trim()).filter(Boolean).join("\n") : "",
+    os: osParam ? osParam.split(",").map((s) => s.trim().toLowerCase()) : null,
+    graviton: params.get("graviton") === "1",
+    burstable: burstableParam === null ? true : burstableParam !== "0",
+  };
+}
+
+async function applyUrlParams(urlParams) {
+  const available = (state.regionsIndex && state.regionsIndex.regions || []).filter((r) => !r.failed);
+  const codes = new Set(available.map((r) => r.code));
+  const region = urlParams.region && codes.has(urlParams.region) ? urlParams.region : pickDefaultRegion(state.regionsIndex);
+  els.regionSelect.value = region;
+  if (region !== state.currentRegion) await setRegion(region);
+
+  setMode(urlParams.mode);
+  if (urlParams.os) {
+    els.osWindows.checked = urlParams.os.includes("windows");
+    els.osLinux.checked = urlParams.os.includes("linux");
+  }
+  els.graviton.checked = urlParams.graviton;
+  els.burstable.checked = urlParams.burstable;
+
+  if (urlParams.mode === "bulk") {
+    els.bulkTextarea.value = urlParams.types;
+    if (urlParams.types) runSearch(false);
+  } else {
+    els.input.value = urlParams.type;
+    if (urlParams.type) runSearch(false);
+  }
+}
+
+// ---- Search dispatch --------------------------------------------------------------
+
 function handleSearch(event) {
   event.preventDefault();
-  clearResults();
+  runSearch(true);
+}
 
-  const instanceType = els.input.value.trim();
-  if (!instanceType) {
-    showStatus("Enter an instance type, e.g. m5.xlarge.", "error");
-    return;
-  }
+function runSearch(pushHistory) {
+  updateUrl(pushHistory);
+  clearResults();
+  showStatus("", "");
 
   const osSelections = [];
   if (els.osWindows.checked) osSelections.push("Windows");
@@ -501,7 +742,24 @@ function handleSearch(event) {
     showStatus("Pricing data isn't loaded yet for this region. Try again in a moment.", "error");
     return;
   }
+
+  const includeGraviton = els.graviton.checked;
+  const includeBurstable = els.burstable.checked;
+
+  if (state.mode === "bulk") {
+    runBulkSearch(regionData, osSelections, includeGraviton, includeBurstable);
+  } else {
+    runSingleSearch(regionData, osSelections, includeGraviton, includeBurstable);
+  }
+}
+
+function runSingleSearch(regionData, osSelections, includeGraviton, includeBurstable) {
   const { instances, excludedTypes } = regionData;
+  const instanceType = els.input.value.trim();
+  if (!instanceType) {
+    showStatus("Enter an instance type, e.g. m5.xlarge.", "error");
+    return;
+  }
 
   if (!anyRowMatchesType(instances, instanceType)) {
     const reason = findExcludedReason(excludedTypes, instanceType);
@@ -519,16 +777,35 @@ function handleSearch(event) {
     return;
   }
 
-  showStatus("", "");
   els.results.hidden = false;
-  els.results.innerHTML = "";
-
-  const includeGraviton = els.graviton.checked;
-  const includeBurstable = els.burstable.checked;
   for (const os of osSelections) {
     const baseline = findBaselineRow(instances, instanceType, os);
     els.results.appendChild(renderOsSection(os, baseline, instances, includeGraviton, includeBurstable));
   }
+}
+
+function runBulkSearch(regionData, osSelections, includeGraviton, includeBurstable) {
+  const { instances, excludedTypes } = regionData;
+  const allTypes = parseBulkInput(els.bulkTextarea.value);
+  const types = allTypes.slice(0, MAX_BULK_TYPES);
+  const totalEntered = allTypes.length;
+
+  if (types.length === 0) {
+    showStatus("Enter at least one instance type, one per line.", "error");
+    return;
+  }
+
+  const rows = runBulkLookup(types, osSelections, instances, excludedTypes, includeGraviton, includeBurstable);
+
+  els.results.hidden = false;
+  if (totalEntered > MAX_BULK_TYPES) {
+    els.results.appendChild(
+      el("p", { class: "empty-note" }, [
+        `Only the first ${MAX_BULK_TYPES} instance types were processed (${totalEntered} entered).`,
+      ])
+    );
+  }
+  els.results.appendChild(renderBulkTable(rows));
 }
 
 function renderFreshness(data) {
@@ -547,13 +824,15 @@ async function init() {
   els.input.addEventListener("focus", onComboInput);
   els.input.addEventListener("blur", onComboBlur);
   els.regionSelect.addEventListener("change", (e) => setRegion(e.target.value));
+  els.modeToggle.addEventListener("click", () => setMode(state.mode === "bulk" ? "single" : "bulk"));
+  window.addEventListener("popstate", () => {
+    applyUrlParams(parseUrlParams()).catch((err) => console.error(err));
+  });
 
   try {
     state.regionsIndex = await loadRegionsIndex();
     populateRegionSelect(state.regionsIndex);
-    const defaultRegion = pickDefaultRegion(state.regionsIndex);
-    els.regionSelect.value = defaultRegion;
-    await setRegion(defaultRegion);
+    await applyUrlParams(parseUrlParams());
   } catch (err) {
     console.error(err);
     els.freshness.textContent = "Couldn't load region list. Try refreshing the page.";

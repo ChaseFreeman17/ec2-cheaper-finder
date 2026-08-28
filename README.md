@@ -1,10 +1,11 @@
 # EC2 Undercut
 
-A static site: pick an AWS region, enter an EC2 instance type, get back
-current-generation instance types with at least as much vCPU/RAM that cost less
-On-Demand in that region — with any extra vCPU/RAM, network/EBS bandwidth,
-storage-type, and burstable-CPU differences all flagged. See
-[`docs/SPEC.md`](docs/SPEC.md) for the full design and [`CONTEXT.md`](CONTEXT.md) for
+A static site: pick an AWS region, enter an EC2 instance type (or a whole pasted list, in
+bulk mode), get back current-generation instance types with at least as much vCPU/RAM
+that cost less On-Demand in that region — with any extra vCPU/RAM, network/EBS
+bandwidth, storage-type, and burstable-CPU differences all flagged. Every search's URL
+is shareable. See [`docs/SPEC.md`](docs/SPEC.md) for the full design and
+[`CONTEXT.md`](CONTEXT.md) for
 the glossary.
 
 ## Running locally
