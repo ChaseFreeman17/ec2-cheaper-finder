@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EC2 Undercut</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
   <div class="page">
@@ -59,13 +59,17 @@
 
         <div class="field field-toggles">
           <label class="toggle">
-            <input type="checkbox" id="burstable-toggle" checked />
-            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="burstable-toggle" checked />
+              <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+            </span>
             <span class="toggle-label">Include burstable instance types</span>
           </label>
           <label class="toggle">
-            <input type="checkbox" id="graviton-toggle" />
-            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="graviton-toggle" />
+              <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+            </span>
             <span class="toggle-label">Include Graviton (ARM) results</span>
           </label>
         </div>
