@@ -209,6 +209,23 @@ function formatMoney(n) {
   return `$${n.toFixed(4).replace(/0+$/, "").replace(/\.$/, ".0")}/hr`;
 }
 
+// Hourly savings alone are hard to feel the scale of, so results also show projected
+// monthly/yearly savings assuming the instance runs continuously — the same 730-hr/month,
+// 8,760-hr/year averages AWS's own pricing calculator uses.
+const HOURS_PER_MONTH = 730;
+const HOURS_PER_YEAR = 8760;
+
+function formatMoneyCompact(n) {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function renderProjectedSavings(savingsPerHour) {
+  return el("td", { class: "savings-projected" }, [
+    el("span", { class: "savings-monthly", text: `${formatMoneyCompact(savingsPerHour * HOURS_PER_MONTH)}/mo` }),
+    el("span", { class: "savings-yearly", text: `${formatMoneyCompact(savingsPerHour * HOURS_PER_YEAR)}/yr` }),
+  ]);
+}
+
 function el(tag, attrs, children) {
   const node = document.createElement(tag);
   if (attrs) {
@@ -268,6 +285,7 @@ function renderResultsTable(baseline, matches) {
       el("th", { text: "Instance type" }),
       el("th", { text: "Price" }),
       el("th", { text: "Savings" }),
+      el("th", { title: "Assumes the instance runs continuously (730 hrs/month, 8,760 hrs/year)", text: "Projected savings" }),
       el("th", { text: "What changes" }),
     ]),
   ]);
@@ -307,6 +325,7 @@ function renderResultsTable(baseline, matches) {
           el("span", { class: "savings-abs", text: `-${formatMoney(savingsPerHour)}` }),
           el("span", { class: "savings-pct", text: `-${savingsPercent.toFixed(0)}%` }),
         ]),
+        renderProjectedSavings(savingsPerHour),
         flagsCell,
       ])
     );
@@ -562,6 +581,7 @@ function renderBulkTable(rows) {
       el("th", { text: "Price" }),
       el("th", { text: "Best match" }),
       el("th", { text: "Savings" }),
+      el("th", { title: "Assumes the instance runs continuously (730 hrs/month, 8,760 hrs/year)", text: "Projected savings" }),
       el("th", { text: "" }),
     ]),
   ]);
@@ -576,7 +596,7 @@ function renderBulkTable(rows) {
       tbody.appendChild(
         el("tr", { class: "bulk-row-note" }, [
           el("td", { text: row.inputType }),
-          el("td", { colspan: "5", class: "no-diff", text: msg }),
+          el("td", { colspan: "6", class: "no-diff", text: msg }),
         ])
       );
       continue;
@@ -586,7 +606,7 @@ function renderBulkTable(rows) {
         el("tr", { class: "bulk-row-note" }, [
           el("td", { text: row.inputType }),
           el("td", { text: row.os }),
-          el("td", { colspan: "4", class: "no-diff", text: `No ${row.os} pricing found` }),
+          el("td", { colspan: "5", class: "no-diff", text: `No ${row.os} pricing found` }),
         ])
       );
       continue;
@@ -597,7 +617,7 @@ function renderBulkTable(rows) {
           el("td", { text: row.baseline.instanceType }),
           el("td", { text: row.os }),
           el("td", { text: formatMoney(row.baseline.pricePerHour) }),
-          el("td", { colspan: "3", class: "no-diff", text: "No cheaper equivalent found" }),
+          el("td", { colspan: "4", class: "no-diff", text: "No cheaper equivalent found" }),
         ])
       );
       continue;
@@ -631,6 +651,7 @@ function renderBulkTable(rows) {
           el("span", { class: "savings-abs", text: `-${formatMoney(savingsPerHour)}` }),
           el("span", { class: "savings-pct", text: `-${savingsPercent.toFixed(0)}%` }),
         ]),
+        renderProjectedSavings(savingsPerHour),
         el("td", null, [detailsBtn]),
       ])
     );

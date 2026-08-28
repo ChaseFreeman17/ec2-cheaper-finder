@@ -514,6 +514,23 @@ body {
   font-size: 0.85rem;
 }
 
+.savings-projected {
+  white-space: nowrap;
+}
+
+.savings-monthly {
+  color: var(--success);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  display: block;
+}
+
+.savings-yearly {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+}
+
 .diff-badge {
   display: block;
   font-size: 0.8rem;

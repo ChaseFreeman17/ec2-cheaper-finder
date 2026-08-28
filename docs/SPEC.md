@@ -189,8 +189,11 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
   ⚡ badge), so this defaults to showing them; turning it off filters burst-capable rows
   out of candidates only, never hides a burstable baseline.
 - **Results table**, sorted cheapest first, columns: instance type, price/hr, savings
-  ($/hr and %), flagged differences (as small inline badges/tags, only shown when
-  present for that row).
+  ($/hr and %), projected savings (monthly and yearly, assuming the instance runs
+  continuously — 730 hrs/month, 8,760 hrs/year, the same averages AWS's own pricing
+  calculator uses), flagged differences (as small inline badges/tags, only shown when
+  present for that row). Bulk mode's summary table carries the same projected-savings
+  column.
 - **Bulk lookup mode**: a "Switch to bulk lookup" link next to the instance-type label
   swaps the combobox for a textarea (one instance type per line, or comma-separated).
   Submitting runs the *same* matching logic once per (instance type × selected OS) pair
