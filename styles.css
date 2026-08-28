@@ -230,10 +230,10 @@ body {
 }
 
 .field-toggles {
-  grid-column: 4;
+  grid-column: 1 / -1;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 12px 32px;
 }
 
 .toggle {
@@ -492,8 +492,7 @@ body {
     grid-template-columns: 1fr;
   }
   .field-region,
-  .field-os,
-  .field-toggles {
+  .field-os {
     grid-column: 1;
   }
   .field-region select {
