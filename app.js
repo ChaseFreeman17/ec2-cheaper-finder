@@ -161,30 +161,87 @@ function findMatches(instances, baseline, includeGraviton, includeBurstable) {
     .sort((a, b) => a.pricePerHour - b.pricePerHour);
 }
 
+// Best-effort numeric parsing for AWS's free-text bandwidth fields, so flagged
+// differences can be colored by whether they're an improvement or a regression rather
+// than left as a flat neutral gray. Returns Mbps, or null if the text doesn't parse (in
+// which case the flag falls back to neutral — we'd rather show "unknown direction" than
+// guess wrong).
+function parseNetworkMbps(text) {
+  if (!text) return null;
+  const numMatch = text.match(/([\d,.]+)\s*(gigabit|megabit)/i);
+  if (numMatch) {
+    const num = parseFloat(numMatch[1].replace(/,/g, ""));
+    return /gigabit/i.test(numMatch[2]) ? num * 1000 : num;
+  }
+  const qualitative = {
+    "very low": 0.5,
+    low: 1,
+    "low to moderate": 1.5,
+    moderate: 2,
+    "moderate to high": 2.5,
+    high: 3,
+  };
+  const key = text.trim().toLowerCase();
+  return key in qualitative ? qualitative[key] : null;
+}
+
+function parseEbsMbps(text) {
+  if (!text) return null;
+  const m = text.match(/([\d,.]+)\s*mbps/i);
+  return m ? parseFloat(m[1].replace(/,/g, "")) : null;
+}
+
+// "better"/"worse" drives the green/orange coloring in the UI; "neutral" covers changes
+// with no universally-agreed direction (storage type, architecture) or ones we couldn't
+// parse a number out of.
+function compareDirection(baselineVal, candidateVal) {
+  if (baselineVal == null || candidateVal == null) return "neutral";
+  if (candidateVal > baselineVal) return "better";
+  if (candidateVal < baselineVal) return "worse";
+  return "neutral";
+}
+
 function flaggedDifferences(baseline, candidate) {
   const flags = [];
   if (candidate.vcpu !== baseline.vcpu) {
-    flags.push({ label: "vCPU", text: `${baseline.vcpu} → ${candidate.vcpu}` });
+    // Matching only ever surfaces candidates with vcpu >= baseline, so a flagged vCPU
+    // difference is always extra headroom, never less.
+    flags.push({ label: "vCPU", text: `${baseline.vcpu} → ${candidate.vcpu}`, direction: "better" });
   }
   if (candidate.memoryGiB !== baseline.memoryGiB) {
-    flags.push({ label: "RAM", text: `${baseline.memoryGiB} GiB → ${candidate.memoryGiB} GiB` });
+    flags.push({
+      label: "RAM",
+      text: `${baseline.memoryGiB} GiB → ${candidate.memoryGiB} GiB`,
+      direction: "better",
+    });
   }
   if (candidate.networkPerformance !== baseline.networkPerformance) {
     flags.push({
       label: "Network",
       text: `${baseline.networkPerformance} → ${candidate.networkPerformance}`,
+      direction: compareDirection(
+        parseNetworkMbps(baseline.networkPerformance),
+        parseNetworkMbps(candidate.networkPerformance)
+      ),
     });
   }
   if (candidate.dedicatedEbsThroughput !== baseline.dedicatedEbsThroughput) {
     flags.push({
       label: "EBS bandwidth",
       text: `${baseline.dedicatedEbsThroughput} → ${candidate.dedicatedEbsThroughput}`,
+      direction: compareDirection(
+        parseEbsMbps(baseline.dedicatedEbsThroughput),
+        parseEbsMbps(candidate.dedicatedEbsThroughput)
+      ),
     });
   }
   if (candidate.storageType !== baseline.storageType) {
+    // EBS-only vs. instance-store isn't a strict upgrade/downgrade either direction
+    // (instance-store is faster but ephemeral) — left neutral rather than guessing.
     flags.push({
       label: "Storage",
       text: `${baseline.storageType} → ${candidate.storageType}`,
+      direction: "neutral",
     });
   }
   // Burst-capable candidates get their own prominent badge (see renderBurstBadge)
@@ -194,6 +251,7 @@ function flaggedDifferences(baseline, candidate) {
     flags.push({
       label: "Architecture",
       text: `${baseline.architecture} → ${candidate.architecture}`,
+      direction: "neutral",
     });
   }
   return flags;
@@ -302,7 +360,7 @@ function renderResultsTable(baseline, matches) {
     } else {
       for (const flag of flags) {
         flagsCell.appendChild(
-          el("span", { class: "diff-badge", title: flag.text }, [
+          el("span", { class: `diff-badge diff-badge-${flag.direction}`, title: flag.text }, [
             el("strong", { text: flag.label + ": " }),
             document.createTextNode(flag.text),
           ])

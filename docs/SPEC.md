@@ -142,7 +142,16 @@ baseline row:
    - flagged differences: compare `vcpu`, `memoryGiB`, `networkPerformance`,
      `dedicatedEbsThroughput`, `storageType` against the baseline; include only the ones
      that differ (a candidate with more vCPU/RAM than the baseline gets flagged the same
-     way a network/storage change does)
+     way a network/storage change does). Each flag also carries a `direction` —
+     `"better"`, `"worse"`, or `"neutral"` — shown in the UI as green/orange/muted text.
+     vCPU and RAM flags are always `"better"` (matching only ever surfaces candidates with
+     at least as much of each). Network/EBS bandwidth direction is inferred by parsing
+     AWS's free-text fields down to a comparable Mbps number (handling both "Up to N
+     Gigabit"/"N Megabit" phrasing and qualitative terms like "Moderate"/"High"); when
+     either side doesn't parse, the flag falls back to `"neutral"` rather than guessing.
+     Storage type and architecture changes are always `"neutral"` — there's no
+     universally-agreed direction (e.g. instance-store is faster than EBS-only but
+     ephemeral, not simply better).
    - burst badge: if `burstKind` is non-null, render a prominent warning-styled badge
      (not a flagged difference) — shown for *any* burst-capable row, baseline or
      candidate, regardless of whether the baseline itself was also burst-capable
