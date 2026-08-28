@@ -229,8 +229,14 @@ body {
   accent-color: var(--accent);
 }
 
-.field-toggle {
+.field-toggles {
   grid-column: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toggle {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -487,7 +493,7 @@ body {
   }
   .field-region,
   .field-os,
-  .field-toggle {
+  .field-toggles {
     grid-column: 1;
   }
   .field-region select {

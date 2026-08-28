@@ -131,6 +131,8 @@ baseline row:
      (never less, but more is fine — see CONTEXT.md's "Match" entry for why this isn't
      exact-only)
    - `architecture` is `x86_64`, or `arm64` only if the Graviton toggle is on
+   - `burstKind` is falsy, or truthy is fine if the "include burstable" toggle is on
+     (on by default — this only filters candidates, never hides a burstable baseline)
    - `pricePerHour` < baseline's `pricePerHour`
 2. For each surviving row, compute:
    - `savingsPerHour = baseline.pricePerHour - candidate.pricePerHour`
@@ -180,6 +182,10 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
 - **OS checkboxes**: Windows (checked by default), Linux (unchecked by default) —
   multi-select, at least one must be checked to search.
 - **Graviton toggle**: off by default.
+- **Include burstable instance types toggle**: on by default — unlike Graviton, most
+  teammates want burstable candidates visible (they're already called out with the
+  ⚡ badge), so this defaults to showing them; turning it off filters burst-capable rows
+  out of candidates only, never hides a burstable baseline.
 - **Results table**, sorted cheapest first, columns: instance type, price/hr, savings
   ($/hr and %), flagged differences (as small inline badges/tags, only shown when
   present for that row).

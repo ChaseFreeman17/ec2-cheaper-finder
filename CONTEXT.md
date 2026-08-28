@@ -49,7 +49,10 @@ hard to baseline once credits run out) or a **flex** family (`c7i-flex`, `c8i-fl
 95% of a rolling 24-hour window, with gradual (not hard) throttling under sustained high
 utilization. Unlike an ordinary flagged difference, a burst-capable **candidate** is
 highlighted prominently wherever it appears — not just noted when it differs from the
-baseline — since it changes CPU performance guarantees rather than a peripheral spec.
+baseline — since it changes CPU performance guarantees rather than a peripheral spec. A
+checkbox ("Include burstable instance types", on by default) controls whether
+burst-capable rows can appear as **candidates** at all; it never hides a burst-capable
+**baseline** itself, only filters candidates.
 _Avoid_: Burstable (on its own, implies only T-family and misses flex)
 
 **Excluded type**:

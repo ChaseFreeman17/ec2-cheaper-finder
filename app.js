@@ -60,6 +60,7 @@ function cacheEls() {
   els.comboList = byId("instance-type-list");
   els.osWindows = byId("os-windows");
   els.osLinux = byId("os-linux");
+  els.burstable = byId("burstable-toggle");
   els.graviton = byId("graviton-toggle");
   els.status = byId("status");
   els.results = byId("results");
@@ -133,7 +134,7 @@ function findExcludedReason(excludedTypes, instanceType) {
   return null;
 }
 
-function findMatches(instances, baseline, includeGraviton) {
+function findMatches(instances, baseline, includeGraviton, includeBurstable) {
   return instances
     .filter((r) => {
       if (r.os !== baseline.os) return false;
@@ -145,6 +146,9 @@ function findMatches(instances, baseline, includeGraviton) {
       if (r.vcpu < baseline.vcpu) return false;
       if (r.memoryGiB < baseline.memoryGiB) return false;
       if (r.architecture === "arm64" && !includeGraviton) return false;
+      // The toggle only filters candidates, not the baseline — a burstable baseline is
+      // still searched normally even with "include burstable" off.
+      if (r.burstKind && !includeBurstable) return false;
       if (!(r.pricePerHour < baseline.pricePerHour)) return false;
       return true;
     })
@@ -307,7 +311,7 @@ function renderResultsTable(baseline, matches) {
   return table;
 }
 
-function renderOsSection(osLabel, baseline, instances, includeGraviton) {
+function renderOsSection(osLabel, baseline, instances, includeGraviton, includeBurstable) {
   const section = el("div", { class: "os-section" }, [
     el("h2", { text: osLabel }),
   ]);
@@ -322,7 +326,7 @@ function renderOsSection(osLabel, baseline, instances, includeGraviton) {
     return section;
   }
 
-  const matches = findMatches(instances, baseline, includeGraviton);
+  const matches = findMatches(instances, baseline, includeGraviton, includeBurstable);
   section.appendChild(renderBaselineCard(baseline));
   section.appendChild(renderResultsTable(baseline, matches));
   return section;
@@ -520,9 +524,10 @@ function handleSearch(event) {
   els.results.innerHTML = "";
 
   const includeGraviton = els.graviton.checked;
+  const includeBurstable = els.burstable.checked;
   for (const os of osSelections) {
     const baseline = findBaselineRow(instances, instanceType, os);
-    els.results.appendChild(renderOsSection(os, baseline, instances, includeGraviton));
+    els.results.appendChild(renderOsSection(os, baseline, instances, includeGraviton, includeBurstable));
   }
 }
 

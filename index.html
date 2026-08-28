@@ -57,11 +57,18 @@
           </label>
         </fieldset>
 
-        <label class="field field-toggle toggle">
-          <input type="checkbox" id="graviton-toggle" />
-          <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
-          <span class="toggle-label">Include Graviton (ARM) results</span>
-        </label>
+        <div class="field field-toggles">
+          <label class="toggle">
+            <input type="checkbox" id="burstable-toggle" checked />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Include burstable instance types</span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="graviton-toggle" />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">Include Graviton (ARM) results</span>
+          </label>
+        </div>
 
         <button type="submit" class="submit-btn">Find cheaper equivalents</button>
       </form>
