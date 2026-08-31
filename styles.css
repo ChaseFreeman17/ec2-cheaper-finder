@@ -344,17 +344,47 @@ body {
   flex-wrap: wrap;
 }
 
+/* One bordered box per input, with the "vCPU ≥" / "RAM (GiB) ≥" label as a prefix
+   inside the box rather than a separate line above it — specs mode previously had two
+   stacked titles ("Minimum specs" then "Min vCPU"/"Min RAM (GiB)"), which pushed its
+   input boxes lower than region/OS's single-title fields and broke the top alignment
+   .search-card otherwise guarantees. This keeps it to one title line, like every other
+   field. */
 .specs-input {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1 1 140px;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 160px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  cursor: text;
 }
 
-.specs-input label {
-  font-size: 0.78rem;
+.specs-input:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.specs-input-prefix {
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.specs-input input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.specs-input input:focus {
+  outline: none;
 }
 
 .specs-hint {

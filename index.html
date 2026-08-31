@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EC2 Undercut</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=10" />
 </head>
 <body>
   <div class="page">
@@ -106,14 +106,14 @@
           ></textarea>
           <div class="specs-mode-field" id="specs-mode-field" hidden>
             <div class="specs-inputs">
-              <div class="specs-input">
-                <label for="specs-vcpu">Min vCPU</label>
-                <input type="number" id="specs-vcpu" min="1" step="1" inputmode="numeric" placeholder="e.g. 4" />
-              </div>
-              <div class="specs-input">
-                <label for="specs-ram">Min RAM (GiB)</label>
-                <input type="number" id="specs-ram" min="0.5" step="0.5" inputmode="decimal" placeholder="e.g. 16" />
-              </div>
+              <label class="specs-input">
+                <span class="specs-input-prefix">vCPU ≥</span>
+                <input type="number" id="specs-vcpu" min="1" step="1" inputmode="numeric" placeholder="4" />
+              </label>
+              <label class="specs-input">
+                <span class="specs-input-prefix">RAM (GiB) ≥</span>
+                <input type="number" id="specs-ram" min="0.5" step="0.5" inputmode="decimal" placeholder="16" />
+              </label>
             </div>
             <p class="specs-hint">
               Shows current-generation instance types meeting these minimums, cheapest
