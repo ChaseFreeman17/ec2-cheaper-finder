@@ -123,7 +123,12 @@ body {
   display: grid;
   gap: 20px;
   grid-template-columns: auto 1fr auto auto;
-  align-items: end;
+  /* Top-align rather than bottom-align each field within its grid row: field-instance's
+     height varies a lot by mode (a one-line input vs. a textarea vs. inputs-plus-hint-
+     text), and top-aligning is what keeps every field's label — and its first control —
+     starting at the same y regardless of how tall that field's field-instance neighbor
+     grows underneath. */
+  align-items: start;
 }
 
 .field label,
@@ -251,14 +256,17 @@ body {
   color: var(--accent);
 }
 
-/* Segmented single/bulk/specs mode switch. A real pill control above the field —
-   not small text links buried next to the label — so all three modes are visible at a
-   glance instead of something a teammate only discovers by accident. */
+/* Segmented single/bulk/specs mode switch. A real pill control on its own row above
+   the region/instance-type fields — not small text links buried next to a label, and
+   not nested inside field-instance, which threw off that field's alignment with
+   field-region next to it (an extra row inside just one grid item makes only that
+   item taller, and .search-card's other fields would no longer start at the same y). */
 .mode-tabs {
+  grid-column: 1 / -1;
   display: inline-flex;
   gap: 2px;
   padding: 3px;
-  margin-bottom: 14px;
+  width: fit-content;
   border-radius: 999px;
   background: var(--surface-alt);
   border: 1px solid var(--border);

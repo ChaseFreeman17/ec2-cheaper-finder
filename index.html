@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EC2 Undercut</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
 </head>
 <body>
   <div class="page">
@@ -38,17 +38,18 @@
 
     <main>
       <form id="search-form" class="search-card" autocomplete="off">
+        <div class="mode-tabs" role="tablist" aria-label="Search mode">
+          <button type="button" class="mode-tab active" data-mode="single" role="tab" aria-selected="true">Single instance</button>
+          <button type="button" class="mode-tab" data-mode="bulk" role="tab" aria-selected="false">Bulk list</button>
+          <button type="button" class="mode-tab" data-mode="specs" role="tab" aria-selected="false">By specs</button>
+        </div>
+
         <div class="field field-region">
           <label for="region-select">Region</label>
           <select id="region-select"></select>
         </div>
 
         <div class="field field-instance">
-          <div class="mode-tabs" role="tablist" aria-label="Search mode">
-            <button type="button" class="mode-tab active" data-mode="single" role="tab" aria-selected="true">Single instance</button>
-            <button type="button" class="mode-tab" data-mode="bulk" role="tab" aria-selected="false">Bulk list</button>
-            <button type="button" class="mode-tab" data-mode="specs" role="tab" aria-selected="false">By specs</button>
-          </div>
           <div class="field-instance-header">
             <span class="field-instance-label-group">
               <label for="instance-type" id="instance-label">Baseline instance type</label>
