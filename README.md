@@ -9,6 +9,28 @@ shareable. See [`docs/SPEC.md`](docs/SPEC.md) for the full design and
 [`CONTEXT.md`](CONTEXT.md) for
 the glossary.
 
+## Architecture
+
+Fully static: a daily GitHub Actions job refreshes the pricing data and commits it,
+GitHub Pages serves the site, and everything from there — matching, filtering — runs in
+the browser against whatever region's data the user picked. No backend server, no
+database, no user accounts.
+
+```mermaid
+flowchart LR
+    A["AWS Price List<br/>Bulk API<br/>(~35 regions)"]
+    B["scripts/refresh-data.js<br/>filter + trim"]
+    C["data/regions/*.json<br/>(committed to repo)"]
+    D["GitHub Pages<br/>(static hosting)"]
+    E["Browser<br/>index.html + app.js"]
+    F["Client-side matching<br/>(region data cached per session)"]
+
+    A -->|"GitHub Actions<br/>daily + manual dispatch"| B --> C --> D --> E --> F
+```
+
+See [`docs/SPEC.md`](docs/SPEC.md#architecture-adr-0001) for the full breakdown (data
+schema, filtering rules, ADR links).
+
 ## Running locally
 
 No build step. Just serve the directory statically, e.g.:
