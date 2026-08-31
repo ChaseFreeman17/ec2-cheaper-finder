@@ -164,8 +164,8 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
   gap: 4px 12px;
+  margin-bottom: 8px;
 }
 
 .field-instance-label-group {
@@ -251,24 +251,29 @@ body {
   color: var(--accent);
 }
 
-/* Segmented single/bulk/specs mode switch, replacing what used to be a single
-   "Switch to bulk lookup" link now that there are three modes instead of two. */
+/* Segmented single/bulk/specs mode switch. A real pill control above the field —
+   not small text links buried next to the label — so all three modes are visible at a
+   glance instead of something a teammate only discovers by accident. */
 .mode-tabs {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 8px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
 }
 
 .mode-tab {
   background: none;
   border: none;
-  padding: 0;
-  font-size: 0.78rem;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  transition: background 0.15s, color 0.15s;
 }
 
 .mode-tab:hover {
@@ -276,9 +281,9 @@ body {
 }
 
 .mode-tab.active {
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
   cursor: default;
-  text-decoration: none;
 }
 
 .bulk-textarea {
@@ -318,7 +323,7 @@ body {
 .specs-mode-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .specs-mode-field[hidden] {
@@ -327,14 +332,14 @@ body {
 
 .specs-inputs {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .specs-input {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   flex: 1 1 140px;
 }
 
