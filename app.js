@@ -305,14 +305,29 @@ function formatMoneyCompact(n) {
 // the multiplier stays 1 and behavior is unchanged there.
 function renderProjectedSavings(savingsPerHour, count) {
   const multiplier = count && count > 1 ? count : 1;
-  const children = [
-    el("span", { class: "savings-monthly", text: `${formatMoneyCompact(savingsPerHour * HOURS_PER_MONTH * multiplier)}/mo` }),
-    el("span", { class: "savings-yearly", text: `${formatMoneyCompact(savingsPerHour * HOURS_PER_YEAR * multiplier)}/yr` }),
-  ];
-  if (multiplier > 1) {
-    children.push(el("span", { class: "savings-count-note", text: `× ${multiplier} instances` }));
+  const perUnitMonthly = savingsPerHour * HOURS_PER_MONTH;
+  const perUnitYearly = savingsPerHour * HOURS_PER_YEAR;
+
+  if (multiplier === 1) {
+    return el("td", { class: "savings-projected" }, [
+      el("span", { class: "savings-monthly", text: `${formatMoneyCompact(perUnitMonthly)}/mo` }),
+      el("span", { class: "savings-yearly", text: `${formatMoneyCompact(perUnitYearly)}/yr` }),
+    ]);
   }
-  return el("td", { class: "savings-projected" }, children);
+
+  // Fleet-scaled: spell out the actual multiplication (per-instance amount × count =
+  // total) rather than just tacking on a "× N instances" note next to the total — the
+  // note alone didn't show what was being multiplied, only that something was.
+  return el("td", { class: "savings-projected" }, [
+    el("span", { class: "savings-monthly" }, [
+      el("span", { class: "savings-math-unit", text: `${formatMoneyCompact(perUnitMonthly)}/mo × ${multiplier} = ` }),
+      el("span", { class: "savings-math-total", text: `${formatMoneyCompact(perUnitMonthly * multiplier)}/mo` }),
+    ]),
+    el("span", { class: "savings-yearly" }, [
+      el("span", { class: "savings-math-unit", text: `${formatMoneyCompact(perUnitYearly)}/yr × ${multiplier} = ` }),
+      el("span", { class: "savings-math-total", text: `${formatMoneyCompact(perUnitYearly * multiplier)}/yr` }),
+    ]),
+  ]);
 }
 
 function el(tag, attrs, children) {

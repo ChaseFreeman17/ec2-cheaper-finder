@@ -789,7 +789,9 @@ body {
 }
 
 .savings-projected {
-  white-space: nowrap;
+  /* No nowrap here — a fleet-scaled line ("$110.96/mo × 15 = $1,664.40/mo") can run
+     longer than the column, and should wrap rather than force the table wider. */
+  max-width: 220px;
 }
 
 .savings-monthly {
@@ -803,6 +805,17 @@ body {
   color: var(--text-muted);
   font-size: 0.85rem;
   font-family: var(--font-mono);
+}
+
+/* The per-instance amount and the "× count" in a fleet-scaled line are de-emphasized —
+   the point is showing the math, not competing with the total for attention. */
+.savings-math-unit {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.savings-math-total {
+  font-weight: 700;
 }
 
 .diff-badge {
@@ -885,12 +898,6 @@ body {
   color: var(--warning);
   font-weight: 700;
   cursor: help;
-}
-
-.savings-count-note {
-  display: block;
-  font-size: 0.72rem;
-  color: var(--text-muted);
 }
 
 /* Fleet summary: an aggregate stat-tile row above the bulk table, shown once any line
