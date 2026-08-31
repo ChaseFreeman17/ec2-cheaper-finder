@@ -168,21 +168,117 @@ body {
   gap: 4px 12px;
 }
 
-.mode-toggle-link {
+.field-instance-label-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+/* Hoverable/focusable glossary for instance-type lettering (M vs C vs R, the g/i/a/d/n
+   suffix after the generation number) — a plain title="" tooltip can't hold a
+   multi-line list, so this is a small custom popover instead. */
+.info-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: help;
+}
+
+.info-trigger:hover,
+.info-trigger:focus-within {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
+}
+
+.info-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  width: 280px;
+  max-width: 80vw;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 0.8rem;
+  color: var(--text);
+  cursor: auto;
+}
+
+.info-trigger:hover .info-panel,
+.info-trigger:focus-within .info-panel {
+  display: block;
+}
+
+.info-panel-title {
+  margin: 0 0 4px;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.info-panel-title:not(:first-child) {
+  margin-top: 10px;
+}
+
+.info-panel ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.info-panel li {
+  padding: 2px 0;
+  line-height: 1.4;
+}
+
+.info-panel li strong {
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+/* Segmented single/bulk/specs mode switch, replacing what used to be a single
+   "Switch to bulk lookup" link now that there are three modes instead of two. */
+.mode-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.mode-tab {
   background: none;
   border: none;
   padding: 0;
-  margin-bottom: 8px;
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--text-muted);
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.mode-toggle-link:hover {
-  opacity: 0.85;
+.mode-tab:hover {
+  color: var(--text);
+}
+
+.mode-tab.active {
+  color: var(--accent);
+  cursor: default;
+  text-decoration: none;
 }
 
 .bulk-textarea {
@@ -217,6 +313,41 @@ body {
 .field-instance input:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.specs-mode-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.specs-mode-field[hidden] {
+  display: none;
+}
+
+.specs-inputs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.specs-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 140px;
+}
+
+.specs-input label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.specs-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 
 .combobox {

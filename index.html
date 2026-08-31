@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EC2 Undercut</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=6" />
+  <link rel="stylesheet" href="styles.css?v=7" />
 </head>
 <body>
   <div class="page">
@@ -45,8 +45,41 @@
 
         <div class="field field-instance">
           <div class="field-instance-header">
-            <label for="instance-type">Baseline instance type</label>
-            <button type="button" id="mode-toggle" class="mode-toggle-link">Switch to bulk lookup</button>
+            <span class="field-instance-label-group">
+              <label for="instance-type" id="instance-label">Baseline instance type</label>
+              <span class="info-trigger" tabindex="0" aria-label="What the instance-type letters mean">
+                <span aria-hidden="true">ⓘ</span>
+                <div class="info-panel" role="tooltip">
+                  <p class="info-panel-title">Family (first letter)</p>
+                  <ul>
+                    <li><strong>M</strong> — General purpose</li>
+                    <li><strong>C</strong> — Compute optimized</li>
+                    <li><strong>R</strong> — Memory optimized</li>
+                    <li><strong>X</strong> — Extra memory optimized (very high RAM per vCPU)</li>
+                    <li><strong>T</strong> — Burstable, credit-based</li>
+                    <li><strong>I</strong> — Storage (I/O) optimized, local NVMe</li>
+                    <li><strong>D</strong> — Dense HDD storage optimized</li>
+                    <li><strong>Z</strong> — High frequency + high memory</li>
+                    <li><strong>G / P</strong> — GPU-accelerated (excluded from this tool)</li>
+                    <li><strong>F</strong> — FPGA-accelerated (excluded from this tool)</li>
+                    <li><strong>Hpc</strong> — High performance computing</li>
+                  </ul>
+                  <p class="info-panel-title">Suffix after the generation number</p>
+                  <ul>
+                    <li><strong>g</strong> — AWS Graviton (ARM) processor</li>
+                    <li><strong>i</strong> / <strong>a</strong> — Intel / AMD processor</li>
+                    <li><strong>n</strong> — Enhanced networking</li>
+                    <li><strong>d</strong> — Local NVMe SSD storage included</li>
+                    <li><strong>flex</strong> — Flexible baseline/burst compute</li>
+                  </ul>
+                </div>
+              </span>
+            </span>
+            <div class="mode-tabs" role="tablist" aria-label="Search mode">
+              <button type="button" class="mode-tab active" data-mode="single" role="tab" aria-selected="true">Single</button>
+              <button type="button" class="mode-tab" data-mode="bulk" role="tab" aria-selected="false">Bulk</button>
+              <button type="button" class="mode-tab" data-mode="specs" role="tab" aria-selected="false">By specs</button>
+            </div>
           </div>
           <div class="combobox" id="single-mode-field">
             <input
@@ -70,6 +103,23 @@
             spellcheck="false"
             hidden
           ></textarea>
+          <div class="specs-mode-field" id="specs-mode-field" hidden>
+            <div class="specs-inputs">
+              <div class="specs-input">
+                <label for="specs-vcpu">Min vCPU</label>
+                <input type="number" id="specs-vcpu" min="1" step="1" inputmode="numeric" placeholder="e.g. 4" />
+              </div>
+              <div class="specs-input">
+                <label for="specs-ram">Min RAM (GiB)</label>
+                <input type="number" id="specs-ram" min="0.5" step="0.5" inputmode="decimal" placeholder="e.g. 16" />
+              </div>
+            </div>
+            <p class="specs-hint">
+              Shows current-generation instance types meeting these minimums, cheapest
+              first — with no baseline to compare against, nothing is flagged as a
+              "change."
+            </p>
+          </div>
         </div>
 
         <fieldset class="field field-os">
@@ -120,7 +170,7 @@
     </footer>
   </div>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
   <!-- Cloudflare Web Analytics: cookieless, no PII — https://developers.cloudflare.com/web-analytics/
        Classic script (not type="module") deliberately: module scripts are always
        CORS-checked by spec, a plain <script src> isn't — one less way for this to fail

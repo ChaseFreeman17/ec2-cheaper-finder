@@ -14,8 +14,9 @@ same region with vCPU count and RAM at least as much as the baseline's (never le
 costs less on On-Demand pricing, sorted cheapest first, each annotated with any
 **flagged differences** from the baseline — including any extra vCPU/RAM it has beyond
 what the baseline needs. A bulk mode runs the same lookup for a whole pasted list of
-instance types at once (e.g. auditing a fleet), and every search's URL is shareable —
-loading it re-runs the same search (see UI below).
+instance types at once (e.g. auditing a fleet); a "by specs" mode runs it without a
+baseline instance type at all, for a teammate who only knows the vCPU/RAM they need. And
+every search's URL is shareable — loading it re-runs the same search (see UI below).
 
 ## Architecture (ADR-0001)
 
@@ -190,6 +191,11 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
   submit, the typed value is looked up the same way regardless of whether it came from
   a suggestion or was typed by hand; not found (or found only as an excluded type) shows
   an inline error, no results.
+- **Instance-type letter glossary**: a small ⓘ next to the instance-type field label
+  (hover or keyboard-focus to reveal) lists what the family letter (M/C/R/T/...) and the
+  suffix after the generation number (g/i/a/d/n/flex) mean — a hand-maintained static
+  list, not derived from the pricing data, since AWS doesn't expose family semantics as
+  data.
 - **OS checkboxes**: Windows (checked by default), Linux (unchecked by default) —
   multi-select, at least one must be checked to search.
 - **Graviton toggle**: off by default.
@@ -203,24 +209,31 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
   calculator uses), flagged differences (as small inline badges/tags, only shown when
   present for that row). Bulk mode's summary table carries the same projected-savings
   column.
-- **Bulk lookup mode**: a "Switch to bulk lookup" link next to the instance-type label
-  swaps the combobox for a textarea (one instance type per line, or comma-separated).
-  Submitting runs the *same* matching logic once per (instance type × selected OS) pair
-  and renders one condensed summary row each — instance type, OS, price, cheapest match,
-  savings, and a "Details" button — rather than the full baseline-card-plus-table
-  treatment used in single mode, which doesn't scale past a handful of types. A type
-  that's unrecognized or excluded gets a one-line explanatory row instead of being
-  silently skipped. Capped at 300 unique entries per submission (a soft ceiling against
-  a pathological paste, not a realistic fleet size). "Details" jumps back to single mode
-  pre-filled with that exact type/OS for the full breakdown.
-- **Shareable URLs**: every search (region, mode, instance type(s), OS, Graviton/
-  burstable toggles) is reflected in the URL query string on submit — `?region=...` plus
-  either `&type=...` (single mode) or `&mode=bulk&types=...` (bulk mode, comma-joined).
-  Loading a URL with these params re-runs that exact search automatically, so a result
-  can be bookmarked or sent to a teammate. Manual submits push a new history entry
-  (so back/forward step through past searches in a session); the initial URL-driven
-  load and browser back/forward both replay via the same `applyUrlParams` path rather
-  than pushing new entries.
+- **Bulk lookup mode**: a "Bulk" tab next to the instance-type label swaps the combobox
+  for a textarea (one instance type per line, or comma-separated). Submitting runs the
+  *same* matching logic once per (instance type × selected OS) pair and renders one
+  condensed summary row each — instance type, OS, price, cheapest match, savings, and a
+  "Details" button — rather than the full baseline-card-plus-table treatment used in
+  single mode, which doesn't scale past a handful of types. A type that's unrecognized
+  or excluded gets a one-line explanatory row instead of being silently skipped. Capped
+  at 300 unique entries per submission (a soft ceiling against a pathological paste, not
+  a realistic fleet size). "Details" jumps back to single mode pre-filled with that
+  exact type/OS for the full breakdown.
+- **By-specs mode**: a "By specs" tab swaps the instance-type field for two number
+  inputs (min vCPU, min RAM in GiB), for a teammate who wants to shop by specs rather
+  than convert a specific instance type. Submitting lists every current-generation type
+  meeting those minimums, cheapest first, per selected OS (same Graviton/burstable
+  toggles apply) — no savings or flagged-differences columns, since there's no baseline
+  to compare against.
+- **Shareable URLs**: every search (region, mode, instance type(s) or specs, OS,
+  Graviton/burstable toggles) is reflected in the URL query string on submit —
+  `?region=...` plus `&type=...` (single mode), `&mode=bulk&types=...` (bulk mode,
+  comma-joined), or `&mode=specs&vcpu=...&ram=...` (by-specs mode). Loading a URL with
+  these params re-runs that exact search automatically, so a result can be bookmarked or
+  sent to a teammate. Manual submits push a new history entry (so back/forward step
+  through past searches in a session); the initial URL-driven load and browser
+  back/forward both replay via the same `applyUrlParams` path rather than pushing new
+  entries.
 
 ## Repo layout
 

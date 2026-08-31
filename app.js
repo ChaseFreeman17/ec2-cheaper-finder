@@ -62,7 +62,11 @@ function cacheEls() {
   els.comboList = byId("instance-type-list");
   els.singleModeField = byId("single-mode-field");
   els.bulkTextarea = byId("bulk-instance-types");
-  els.modeToggle = byId("mode-toggle");
+  els.specsModeField = byId("specs-mode-field");
+  els.specsVcpu = byId("specs-vcpu");
+  els.specsRam = byId("specs-ram");
+  els.instanceLabel = byId("instance-label");
+  els.modeTabs = document.querySelectorAll(".mode-tab");
   els.submitBtn = byId("submit-btn");
   els.osWindows = byId("os-windows");
   els.osLinux = byId("os-linux");
@@ -156,6 +160,23 @@ function findMatches(instances, baseline, includeGraviton, includeBurstable) {
       // still searched normally even with "include burstable" off.
       if (r.burstKind && !includeBurstable) return false;
       if (!(r.pricePerHour < baseline.pricePerHour)) return false;
+      return true;
+    })
+    .sort((a, b) => a.pricePerHour - b.pricePerHour);
+}
+
+// Same shape as findMatches, but for the "search by specs" mode: there's no baseline
+// instance to be strictly cheaper than, so this just lists every current-generation type
+// meeting the given minimums, cheapest first.
+function findSpecMatches(instances, minVcpu, minMemoryGiB, os, includeGraviton, includeBurstable) {
+  return instances
+    .filter((r) => {
+      if (r.os !== os) return false;
+      if (!r.currentGeneration) return false;
+      if (r.vcpu < minVcpu) return false;
+      if (r.memoryGiB < minMemoryGiB) return false;
+      if (r.architecture === "arm64" && !includeGraviton) return false;
+      if (r.burstKind && !includeBurstable) return false;
       return true;
     })
     .sort((a, b) => a.pricePerHour - b.pricePerHour);
@@ -394,6 +415,48 @@ function renderResultsTable(baseline, matches) {
   return table;
 }
 
+// "Search by specs" mode has no baseline to diff against or save against, so its table
+// is just instance type / vCPU / RAM / price, cheapest first — no savings or flagged-
+// differences columns.
+function renderSpecsTable(matches) {
+  if (matches.length === 0) {
+    return el("p", { class: "empty-note", text: "No current-generation instance types meet these minimums." });
+  }
+
+  const table = el("table", { class: "results-table" }, []);
+  const thead = el("thead", null, [
+    el("tr", null, [
+      el("th", { text: "Instance type" }),
+      el("th", { text: "vCPU" }),
+      el("th", { text: "RAM" }),
+      el("th", { text: "Price" }),
+    ]),
+  ]);
+  const tbody = el("tbody", null, []);
+
+  for (const row of matches) {
+    const typeCell = el("td", null, [
+      el("strong", { text: row.instanceType }),
+      el("span", { class: "pill pill-muted small", text: row.architecture }),
+    ]);
+    const burstBadge = renderBurstBadge(row);
+    if (burstBadge) typeCell.appendChild(burstBadge);
+
+    tbody.appendChild(
+      el("tr", { class: row.burstKind ? "burst-row" : "" }, [
+        typeCell,
+        el("td", { text: String(row.vcpu) }),
+        el("td", { text: `${row.memoryGiB} GiB` }),
+        el("td", { text: formatMoney(row.pricePerHour) }),
+      ])
+    );
+  }
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  return table;
+}
+
 function renderOsSection(osLabel, baseline, instances, includeGraviton, includeBurstable) {
   const section = el("div", { class: "os-section" }, [
     el("h2", { text: osLabel }),
@@ -561,15 +624,32 @@ async function setRegion(code) {
   }
 }
 
-// ---- Mode switching (single lookup vs. bulk lookup) ---------------------------------
+// ---- Mode switching (single lookup vs. bulk lookup vs. spec search) -----------------
+
+const MODE_LABELS = {
+  single: "Baseline instance type",
+  bulk: "Instance types (one per line)",
+  specs: "Minimum specs",
+};
+
+const MODE_SUBMIT_LABELS = {
+  single: "Find cheaper equivalents",
+  bulk: "Find cheaper equivalents for all",
+  specs: "Find matching instance types",
+};
 
 function setMode(mode) {
   state.mode = mode;
-  const isBulk = mode === "bulk";
-  els.singleModeField.hidden = isBulk;
-  els.bulkTextarea.hidden = !isBulk;
-  els.modeToggle.textContent = isBulk ? "Switch to single lookup" : "Switch to bulk lookup";
-  els.submitBtn.textContent = isBulk ? "Find cheaper equivalents for all" : "Find cheaper equivalents";
+  els.singleModeField.hidden = mode !== "single";
+  els.bulkTextarea.hidden = mode !== "bulk";
+  els.specsModeField.hidden = mode !== "specs";
+  els.instanceLabel.textContent = MODE_LABELS[mode];
+  els.submitBtn.textContent = MODE_SUBMIT_LABELS[mode];
+  els.modeTabs.forEach((btn) => {
+    const active = btn.dataset.mode === mode;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", String(active));
+  });
   clearResults();
   showStatus("", "");
 }
@@ -741,6 +821,12 @@ function buildSearchParams() {
     params.set("mode", "bulk");
     const types = parseBulkInput(els.bulkTextarea.value);
     if (types.length) params.set("types", types.join(","));
+  } else if (state.mode === "specs") {
+    params.set("mode", "specs");
+    const vcpu = els.specsVcpu.value.trim();
+    const ram = els.specsRam.value.trim();
+    if (vcpu) params.set("vcpu", vcpu);
+    if (ram) params.set("ram", ram);
   } else {
     const instanceType = els.input.value.trim();
     if (instanceType) params.set("type", instanceType);
@@ -761,11 +847,14 @@ function parseUrlParams() {
   const osParam = params.get("os");
   const typesParam = params.get("types");
   const burstableParam = params.get("burstable");
+  const modeParam = params.get("mode");
   return {
     region: params.get("region"),
-    mode: params.get("mode") === "bulk" ? "bulk" : "single",
+    mode: modeParam === "bulk" ? "bulk" : modeParam === "specs" ? "specs" : "single",
     type: params.get("type") || "",
     types: typesParam ? typesParam.split(",").map((s) => s.trim()).filter(Boolean).join("\n") : "",
+    vcpu: params.get("vcpu") || "",
+    ram: params.get("ram") || "",
     os: osParam ? osParam.split(",").map((s) => s.trim().toLowerCase()) : null,
     graviton: params.get("graviton") === "1",
     burstable: burstableParam === null ? true : burstableParam !== "0",
@@ -790,6 +879,10 @@ async function applyUrlParams(urlParams) {
   if (urlParams.mode === "bulk") {
     els.bulkTextarea.value = urlParams.types;
     if (urlParams.types) runSearch(false);
+  } else if (urlParams.mode === "specs") {
+    els.specsVcpu.value = urlParams.vcpu;
+    els.specsRam.value = urlParams.ram;
+    if (urlParams.vcpu && urlParams.ram) runSearch(false);
   } else {
     els.input.value = urlParams.type;
     if (urlParams.type) runSearch(false);
@@ -827,8 +920,28 @@ function runSearch(pushHistory) {
 
   if (state.mode === "bulk") {
     runBulkSearch(regionData, osSelections, includeGraviton, includeBurstable);
+  } else if (state.mode === "specs") {
+    runSpecsSearch(regionData, osSelections, includeGraviton, includeBurstable);
   } else {
     runSingleSearch(regionData, osSelections, includeGraviton, includeBurstable);
+  }
+}
+
+function runSpecsSearch(regionData, osSelections, includeGraviton, includeBurstable) {
+  const { instances } = regionData;
+  const minVcpu = parseFloat(els.specsVcpu.value);
+  const minRam = parseFloat(els.specsRam.value);
+  if (!(minVcpu > 0) || !(minRam > 0)) {
+    showStatus("Enter a minimum vCPU count and RAM amount, both greater than 0.", "error");
+    return;
+  }
+
+  els.results.hidden = false;
+  for (const os of osSelections) {
+    const matches = findSpecMatches(instances, minVcpu, minRam, os, includeGraviton, includeBurstable);
+    const section = el("div", { class: "os-section" }, [el("h2", { text: os })]);
+    section.appendChild(renderSpecsTable(matches));
+    els.results.appendChild(section);
   }
 }
 
@@ -903,7 +1016,7 @@ async function init() {
   els.input.addEventListener("focus", onComboInput);
   els.input.addEventListener("blur", onComboBlur);
   els.regionSelect.addEventListener("change", (e) => setRegion(e.target.value));
-  els.modeToggle.addEventListener("click", () => setMode(state.mode === "bulk" ? "single" : "bulk"));
+  els.modeTabs.forEach((btn) => btn.addEventListener("click", () => setMode(btn.dataset.mode)));
   window.addEventListener("popstate", () => {
     applyUrlParams(parseUrlParams()).catch((err) => console.error(err));
   });
