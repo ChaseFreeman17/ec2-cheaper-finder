@@ -5,7 +5,10 @@ bulk mode, or a minimum vCPU/RAM in by-specs mode if you don't have a specific t
 mind), get back current-generation instance types with at least as much vCPU/RAM that
 cost less On-Demand in that region — with any extra vCPU/RAM, network/EBS bandwidth,
 storage-type, and burstable-CPU differences all flagged. Every search's URL is
-shareable. See [`docs/SPEC.md`](docs/SPEC.md) for the full design and
+shareable. Bulk mode doubles as a fleet cost-report tool: paste or import a
+`type,count` list (an actual inventory export works — see docs/SPEC.md for the exact
+format) and it totals up current vs. optimized cost across the whole fleet, exportable
+as CSV. See [`docs/SPEC.md`](docs/SPEC.md) for the full design and
 [`CONTEXT.md`](CONTEXT.md) for
 the glossary.
 

@@ -62,6 +62,8 @@ function cacheEls() {
   els.comboList = byId("instance-type-list");
   els.singleModeField = byId("single-mode-field");
   els.bulkTextarea = byId("bulk-instance-types");
+  els.bulkModeField = byId("bulk-mode-field");
+  els.bulkFileInput = byId("bulk-file-input");
   els.specsModeField = byId("specs-mode-field");
   els.specsVcpu = byId("specs-vcpu");
   els.specsRam = byId("specs-ram");
@@ -298,11 +300,19 @@ function formatMoneyCompact(n) {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function renderProjectedSavings(savingsPerHour) {
-  return el("td", { class: "savings-projected" }, [
-    el("span", { class: "savings-monthly", text: `${formatMoneyCompact(savingsPerHour * HOURS_PER_MONTH)}/mo` }),
-    el("span", { class: "savings-yearly", text: `${formatMoneyCompact(savingsPerHour * HOURS_PER_YEAR)}/yr` }),
-  ]);
+// `count` scales this to a fleet-wide total (bulk mode, when a line's count > 1) rather
+// than a single instance's projection — single/specs mode calls this with no count, so
+// the multiplier stays 1 and behavior is unchanged there.
+function renderProjectedSavings(savingsPerHour, count) {
+  const multiplier = count && count > 1 ? count : 1;
+  const children = [
+    el("span", { class: "savings-monthly", text: `${formatMoneyCompact(savingsPerHour * HOURS_PER_MONTH * multiplier)}/mo` }),
+    el("span", { class: "savings-yearly", text: `${formatMoneyCompact(savingsPerHour * HOURS_PER_YEAR * multiplier)}/yr` }),
+  ];
+  if (multiplier > 1) {
+    children.push(el("span", { class: "savings-count-note", text: `× ${multiplier} instances` }));
+  }
+  return el("td", { class: "savings-projected" }, children);
 }
 
 function el(tag, attrs, children) {
@@ -641,7 +651,7 @@ const MODE_SUBMIT_LABELS = {
 function setMode(mode) {
   state.mode = mode;
   els.singleModeField.hidden = mode !== "single";
-  els.bulkTextarea.hidden = mode !== "bulk";
+  els.bulkModeField.hidden = mode !== "bulk";
   els.specsModeField.hidden = mode !== "specs";
   els.instanceLabel.textContent = MODE_LABELS[mode];
   els.submitBtn.textContent = MODE_SUBMIT_LABELS[mode];
@@ -660,41 +670,227 @@ function setMode(mode) {
 // treatment (which doesn't scale to dozens of types). Click "Details" on any row to jump
 // back to single mode with the full breakdown for that exact type/OS.
 
-function parseBulkInput(text) {
-  const seen = new Set();
-  const out = [];
-  for (const raw of text.split(/[\n,]/)) {
-    const t = raw.trim();
-    if (!t || seen.has(t.toLowerCase())) continue;
-    seen.add(t.toLowerCase());
-    out.push(t);
+// Bulk mode accepts a "type" or "type,count" per line — count is optional and defaults
+// to 1, so a plain list of instance types (the original bulk-mode format) still works
+// unchanged. Tolerant of tabs or runs of spaces as the delimiter too (common when
+// pasting a column out of a spreadsheet), a leading "#" comment line, and a one-line
+// CSV/TSV header (detected by its first cell not looking like an instance type — no
+// "."). See docs/SPEC.md for the full format. Duplicate types are summed rather than
+// dropped, since a real fleet export can legitimately list the same type on more than
+// one line (e.g. split across AZs).
+function parseFleetInput(text) {
+  const merged = new Map(); // lowercased type -> { type, count, invalidCount }
+  let sawDataLine = false;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+
+    const cells = (line.includes(",") ? line.split(",") : line.split(/\s+/)).map((c) =>
+      c.trim().replace(/^"|"$/g, "")
+    );
+    const type = cells[0] || "";
+    if (!type) continue;
+
+    if (!sawDataLine) {
+      sawDataLine = true;
+      if (!type.includes(".")) continue; // looks like a header row, e.g. "instance_type,count"
+    }
+
+    const countRaw = (cells[1] || "").trim();
+    let count = 1;
+    let invalidCount = false;
+    if (countRaw) {
+      const n = parseInt(countRaw, 10);
+      if (Number.isFinite(n) && n > 0) count = n;
+      else invalidCount = true; // non-numeric or <= 0 — kept at count 1, flagged for the UI
+    }
+
+    const key = type.toLowerCase();
+    const existing = merged.get(key);
+    if (existing) {
+      existing.count += count;
+      existing.invalidCount = existing.invalidCount || invalidCount;
+    } else {
+      merged.set(key, { type, count, invalidCount });
+    }
   }
-  return out;
+  return [...merged.values()];
 }
 
-function runBulkLookup(types, osSelections, instances, excludedTypes, includeGraviton, includeBurstable) {
+function runBulkLookup(entries, osSelections, instances, excludedTypes, includeGraviton, includeBurstable) {
   const rows = [];
-  for (const inputType of types) {
+  for (const { type: inputType, count, invalidCount } of entries) {
     if (!anyRowMatchesType(instances, inputType)) {
       const reason = findExcludedReason(excludedTypes, inputType);
-      rows.push({ inputType, kind: reason ? "excluded" : "not-found", reason });
+      rows.push({ inputType, kind: reason ? "excluded" : "not-found", reason, count });
       continue;
     }
     for (const os of osSelections) {
       const baseline = findBaselineRow(instances, inputType, os);
       if (!baseline) {
-        rows.push({ inputType, os, kind: "no-os" });
+        rows.push({ inputType, os, kind: "no-os", count });
         continue;
       }
       const matches = findMatches(instances, baseline, includeGraviton, includeBurstable);
       if (matches.length === 0) {
-        rows.push({ inputType, os, kind: "no-match", baseline });
+        rows.push({ inputType, os, kind: "no-match", baseline, count });
       } else {
-        rows.push({ inputType, os, kind: "match", baseline, best: matches[0], matchCount: matches.length });
+        rows.push({
+          inputType, os, kind: "match", baseline,
+          best: matches[0], matchCount: matches.length, count, invalidCount,
+        });
       }
     }
   }
   return rows;
+}
+
+// The aggregate fleet-wide picture shown above the bulk table: current cost, optimized
+// cost (using each matched line's cheapest candidate, or its own price again when no
+// cheaper option exists), and the resulting savings — every line weighted by its count.
+// Only "match"/"no-match" rows carry a real price to sum (excluded/not-found/no-os rows
+// don't), so those are the only kinds counted toward the totals.
+function computeFleetSummary(rows) {
+  let currentHourly = 0;
+  let optimizedHourly = 0;
+  let pricedInstanceCount = 0;
+  let pricedLines = 0;
+  let cheaperLines = 0;
+
+  for (const row of rows) {
+    if (row.kind !== "match" && row.kind !== "no-match") continue;
+    const baselinePrice = row.baseline.pricePerHour;
+    const bestPrice = row.kind === "match" ? row.best.pricePerHour : baselinePrice;
+    currentHourly += baselinePrice * row.count;
+    optimizedHourly += bestPrice * row.count;
+    pricedInstanceCount += row.count;
+    pricedLines++;
+    if (row.kind === "match") cheaperLines++;
+  }
+
+  return { currentHourly, optimizedHourly, pricedInstanceCount, pricedLines, cheaperLines };
+}
+
+function escapeCsvCell(value) {
+  const s = String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function buildFleetReportCsv(rows) {
+  const header = [
+    "Instance type", "OS", "Count", "Price/hr", "Best match", "Match price/hr",
+    "Savings/hr", "Savings %", "Fleet savings/mo", "Fleet savings/yr", "Note",
+  ];
+  const lines = [header.map(escapeCsvCell).join(",")];
+
+  for (const row of rows) {
+    if (row.kind === "not-found" || row.kind === "excluded") {
+      const note =
+        row.kind === "excluded"
+          ? `Excluded — ${EXCLUSION_MESSAGES[row.reason] || "outside this tool's scope"}`
+          : "Not recognized in this region";
+      lines.push([row.inputType, "", row.count, "", "", "", "", "", "", "", note].map(escapeCsvCell).join(","));
+      continue;
+    }
+    if (row.kind === "no-os") {
+      lines.push(
+        [row.inputType, row.os, row.count, "", "", "", "", "", "", "", `No ${row.os} pricing found`]
+          .map(escapeCsvCell)
+          .join(",")
+      );
+      continue;
+    }
+    if (row.kind === "no-match") {
+      lines.push(
+        [row.baseline.instanceType, row.os, row.count, row.baseline.pricePerHour.toFixed(4), "", "", "", "", "", "", "No cheaper equivalent found"]
+          .map(escapeCsvCell)
+          .join(",")
+      );
+      continue;
+    }
+    const { baseline, best, count } = row;
+    const savingsPerHour = baseline.pricePerHour - best.pricePerHour;
+    const savingsPercent = (savingsPerHour / baseline.pricePerHour) * 100;
+    lines.push(
+      [
+        baseline.instanceType, row.os, count, baseline.pricePerHour.toFixed(4),
+        best.instanceType, best.pricePerHour.toFixed(4),
+        savingsPerHour.toFixed(4), savingsPercent.toFixed(1),
+        (savingsPerHour * HOURS_PER_MONTH * count).toFixed(2),
+        (savingsPerHour * HOURS_PER_YEAR * count).toFixed(2),
+        row.invalidCount ? "Count wasn't a valid number on the input line — treated as 1" : "",
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    );
+  }
+  return lines.join("\r\n");
+}
+
+function downloadCsv(filename, csvText) {
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderFleetSummary(rows) {
+  const s = computeFleetSummary(rows);
+  if (s.pricedLines === 0) return null; // nothing priced — nothing to summarize
+
+  const savingsHourly = s.currentHourly - s.optimizedHourly;
+  const savingsPercent = s.currentHourly > 0 ? (savingsHourly / s.currentHourly) * 100 : 0;
+
+  const tiles = [
+    el("div", { class: "stat-tile" }, [
+      el("span", { class: "stat-tile-label", text: "Current cost" }),
+      el("span", { class: "stat-tile-value", text: `${formatMoneyCompact(s.currentHourly * HOURS_PER_MONTH)}/mo` }),
+    ]),
+    el("div", { class: "stat-tile" }, [
+      el("span", { class: "stat-tile-label", text: "Optimized cost" }),
+      el("span", { class: "stat-tile-value", text: `${formatMoneyCompact(s.optimizedHourly * HOURS_PER_MONTH)}/mo` }),
+    ]),
+    el("div", { class: "stat-tile" }, [
+      el("span", { class: "stat-tile-label", text: "Monthly savings" }),
+      el("span", { class: "stat-tile-value stat-tile-value-success", text: `${formatMoneyCompact(savingsHourly * HOURS_PER_MONTH)}/mo` }),
+      el("span", { class: "stat-tile-delta", text: `-${savingsPercent.toFixed(0)}%` }),
+    ]),
+    el("div", { class: "stat-tile" }, [
+      el("span", { class: "stat-tile-label", text: "Yearly savings" }),
+      el("span", { class: "stat-tile-value stat-tile-value-success", text: `${formatMoneyCompact(savingsHourly * HOURS_PER_YEAR)}/yr` }),
+    ]),
+  ];
+
+  const note = el("p", { class: "fleet-summary-note" }, [
+    `Across ${s.pricedInstanceCount.toLocaleString()} priced instance${s.pricedInstanceCount === 1 ? "" : "s"} — ${s.cheaperLines} of ${s.pricedLines} entries have a cheaper current-generation option.`,
+  ]);
+
+  const downloadBtn = el("button", { type: "button", class: "fleet-download-btn" }, ["Download report (CSV)"]);
+  downloadBtn.addEventListener("click", () => downloadCsv("ec2-undercut-fleet-report.csv", buildFleetReportCsv(rows)));
+
+  return el("div", { class: "fleet-summary" }, [el("div", { class: "stat-tile-row" }, tiles), note, downloadBtn]);
+}
+
+// "Import CSV" reads the file straight into the textarea (rather than parsing it
+// directly) so the fleet list stays visible and editable before submitting, same as if
+// it had been pasted in by hand.
+function handleBulkFileImport(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = ""; // clear now so re-picking the same file still fires "change"
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    els.bulkTextarea.value = String(reader.result || "");
+    showStatus(`Loaded ${file.name} — review the list below, then submit.`, "");
+  };
+  reader.onerror = () => showStatus(`Couldn't read ${file.name}.`, "error");
+  reader.readAsText(file);
 }
 
 function viewDetails(instanceType, os) {
@@ -716,10 +912,11 @@ function renderBulkTable(rows) {
     el("tr", null, [
       el("th", { text: "Instance type" }),
       el("th", { text: "OS" }),
+      el("th", { title: "Defaults to 1 if not given for this line, e.g. \"m5.xlarge,12\"", text: "Count" }),
       el("th", { text: "Price" }),
       el("th", { text: "Best match" }),
       el("th", { text: "Savings" }),
-      el("th", { title: "Assumes the instance runs continuously (730 hrs/month, 8,760 hrs/year)", text: "Projected savings" }),
+      el("th", { title: "Assumes each instance runs continuously (730 hrs/month, 8,760 hrs/year), scaled by count", text: "Fleet savings" }),
       el("th", { text: "" }),
     ]),
   ]);
@@ -734,7 +931,7 @@ function renderBulkTable(rows) {
       tbody.appendChild(
         el("tr", { class: "bulk-row-note" }, [
           el("td", { text: row.inputType }),
-          el("td", { colspan: "6", class: "no-diff", text: msg }),
+          el("td", { colspan: "7", class: "no-diff", text: msg }),
         ])
       );
       continue;
@@ -744,7 +941,7 @@ function renderBulkTable(rows) {
         el("tr", { class: "bulk-row-note" }, [
           el("td", { text: row.inputType }),
           el("td", { text: row.os }),
-          el("td", { colspan: "5", class: "no-diff", text: `No ${row.os} pricing found` }),
+          el("td", { colspan: "6", class: "no-diff", text: `No ${row.os} pricing found` }),
         ])
       );
       continue;
@@ -754,6 +951,7 @@ function renderBulkTable(rows) {
         el("tr", { class: "bulk-row-note" }, [
           el("td", { text: row.baseline.instanceType }),
           el("td", { text: row.os }),
+          el("td", { class: "bulk-count", text: String(row.count) }),
           el("td", { text: formatMoney(row.baseline.pricePerHour) }),
           el("td", { colspan: "4", class: "no-diff", text: "No cheaper equivalent found" }),
         ])
@@ -762,7 +960,7 @@ function renderBulkTable(rows) {
     }
 
     // row.kind === "match"
-    const { baseline, best, matchCount } = row;
+    const { baseline, best, matchCount, count, invalidCount } = row;
     const savingsPerHour = baseline.pricePerHour - best.pricePerHour;
     const savingsPercent = (savingsPerHour / baseline.pricePerHour) * 100;
 
@@ -776,6 +974,14 @@ function renderBulkTable(rows) {
       matchCell.appendChild(el("span", { class: "bulk-more", text: `+${matchCount - 1} more option${matchCount - 1 === 1 ? "" : "s"}` }));
     }
 
+    const countChildren = [document.createTextNode(String(count))];
+    if (invalidCount) {
+      countChildren.push(
+        el("span", { class: "bulk-count-flag", title: "Count wasn't a valid number on this line — treated as 1" }, ["?"])
+      );
+    }
+    const countCell = el("td", { class: "bulk-count" }, countChildren);
+
     const detailsBtn = el("button", { type: "button", class: "bulk-details-btn" }, ["Details"]);
     detailsBtn.addEventListener("click", () => viewDetails(baseline.instanceType, row.os));
 
@@ -783,13 +989,14 @@ function renderBulkTable(rows) {
       el("tr", { class: best.burstKind ? "burst-row" : "" }, [
         el("td", { text: baseline.instanceType }),
         el("td", { text: row.os }),
+        countCell,
         el("td", { text: formatMoney(baseline.pricePerHour) }),
         matchCell,
         el("td", { class: "savings" }, [
           el("span", { class: "savings-abs", text: `-${formatMoney(savingsPerHour)}` }),
           el("span", { class: "savings-pct", text: `-${savingsPercent.toFixed(0)}%` }),
         ]),
-        renderProjectedSavings(savingsPerHour),
+        renderProjectedSavings(savingsPerHour, count),
         el("td", null, [detailsBtn]),
       ])
     );
@@ -819,8 +1026,13 @@ function buildSearchParams() {
 
   if (state.mode === "bulk") {
     params.set("mode", "bulk");
-    const types = parseBulkInput(els.bulkTextarea.value);
-    if (types.length) params.set("types", types.join(","));
+    const entries = parseFleetInput(els.bulkTextarea.value);
+    if (entries.length) {
+      // "type:count" per entry (":" rather than "," since "," already separates
+      // entries) — count is omitted when it's just 1, keeping old share links
+      // (a bare list of types) working unchanged.
+      params.set("types", entries.map((e) => (e.count > 1 ? `${e.type}:${e.count}` : e.type)).join(","));
+    }
   } else if (state.mode === "specs") {
     params.set("mode", "specs");
     const vcpu = els.specsVcpu.value.trim();
@@ -852,7 +1064,17 @@ function parseUrlParams() {
     region: params.get("region"),
     mode: modeParam === "bulk" ? "bulk" : modeParam === "specs" ? "specs" : "single",
     type: params.get("type") || "",
-    types: typesParam ? typesParam.split(",").map((s) => s.trim()).filter(Boolean).join("\n") : "",
+    types: typesParam
+      ? typesParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((s) => {
+            const [type, count] = s.split(":");
+            return count ? `${type},${count}` : type;
+          })
+          .join("\n")
+      : "",
     vcpu: params.get("vcpu") || "",
     ram: params.get("ram") || "",
     os: osParam ? osParam.split(",").map((s) => s.trim().toLowerCase()) : null,
@@ -978,16 +1200,16 @@ function runSingleSearch(regionData, osSelections, includeGraviton, includeBurst
 
 function runBulkSearch(regionData, osSelections, includeGraviton, includeBurstable) {
   const { instances, excludedTypes } = regionData;
-  const allTypes = parseBulkInput(els.bulkTextarea.value);
-  const types = allTypes.slice(0, MAX_BULK_TYPES);
-  const totalEntered = allTypes.length;
+  const allEntries = parseFleetInput(els.bulkTextarea.value);
+  const entries = allEntries.slice(0, MAX_BULK_TYPES);
+  const totalEntered = allEntries.length;
 
-  if (types.length === 0) {
+  if (entries.length === 0) {
     showStatus("Enter at least one instance type, one per line.", "error");
     return;
   }
 
-  const rows = runBulkLookup(types, osSelections, instances, excludedTypes, includeGraviton, includeBurstable);
+  const rows = runBulkLookup(entries, osSelections, instances, excludedTypes, includeGraviton, includeBurstable);
 
   els.results.hidden = false;
   if (totalEntered > MAX_BULK_TYPES) {
@@ -997,6 +1219,8 @@ function runBulkSearch(regionData, osSelections, includeGraviton, includeBurstab
       ])
     );
   }
+  const summary = renderFleetSummary(rows);
+  if (summary) els.results.appendChild(summary);
   els.results.appendChild(renderBulkTable(rows));
 }
 
@@ -1017,6 +1241,7 @@ async function init() {
   els.input.addEventListener("blur", onComboBlur);
   els.regionSelect.addEventListener("change", (e) => setRegion(e.target.value));
   els.modeTabs.forEach((btn) => btn.addEventListener("click", () => setMode(btn.dataset.mode)));
+  els.bulkFileInput.addEventListener("change", handleBulkFileImport);
   window.addEventListener("popstate", () => {
     applyUrlParams(parseUrlParams()).catch((err) => console.error(err));
   });

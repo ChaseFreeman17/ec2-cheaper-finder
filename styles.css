@@ -305,6 +305,61 @@ body {
   cursor: default;
 }
 
+.bulk-mode-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bulk-mode-field[hidden] {
+  display: none;
+}
+
+.bulk-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Extra-specific selector (not just ".file-import-btn"): this is a <label>, and
+   ".field label" (uppercase, no border, no padding, block) outranks a single class by
+   specificity — it would otherwise win and flatten this back into plain label text. */
+.bulk-toolbar .file-import-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  margin-bottom: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bulk-toolbar .file-import-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.bulk-format-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.bulk-format-hint code {
+  font-family: var(--font-mono);
+  background: var(--surface-alt);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
 .bulk-textarea {
   width: 100%;
   min-height: 96px;
@@ -818,6 +873,96 @@ body {
 
 .bulk-details-btn:hover {
   background: var(--border);
+}
+
+.bulk-count {
+  font-family: var(--font-mono);
+}
+
+.bulk-count-flag {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--warning);
+  font-weight: 700;
+  cursor: help;
+}
+
+.savings-count-note {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Fleet summary: an aggregate stat-tile row above the bulk table, shown once any line
+   is priced. Values use the default proportional figures (not tabular-nums) — these
+   are standalone hero-ish numbers, not a column of numbers that need to align. */
+.fleet-summary {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.stat-tile-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-tile-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.stat-tile-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: proportional-nums;
+}
+
+.stat-tile-value-success {
+  color: var(--success);
+}
+
+.stat-tile-delta {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--success);
+}
+
+.fleet-summary-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.fleet-download-btn {
+  margin-top: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fleet-download-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .footer {

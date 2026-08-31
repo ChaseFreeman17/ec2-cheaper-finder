@@ -79,3 +79,18 @@ _Avoid_: ARM filter, architecture switch
 For a given match, its price difference from the baseline, always expressed as both an
 absolute $/hr amount and a percentage.
 _Avoid_: Discount, delta
+
+**Count**:
+In bulk mode, how many real instances one line of the input represents (`m5.xlarge,12`
+= 12 instances), defaulting to 1 when omitted. Only scales the **fleet summary**'s
+totals and a line's own fleet savings — never the per-unit price or savings shown
+elsewhere, which always describe a single instance.
+_Avoid_: Quantity, size (ambiguous with instance size, e.g. `.xlarge`)
+
+**Fleet summary**:
+In bulk mode, the aggregate current cost, optimized cost, and resulting savings across
+every priced line, each weighted by its **count** — shown as stat tiles above the bulk
+table whenever at least one line was priced. Distinct from a single line's own savings:
+the fleet summary is the whole pasted (or imported) list's picture, not one entry's.
+_Avoid_: Report (too generic — the CSV export is "the report," this is the on-page
+summary that gates whether one renders)

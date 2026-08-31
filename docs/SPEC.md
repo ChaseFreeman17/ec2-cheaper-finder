@@ -210,15 +210,33 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
   present for that row). Bulk mode's summary table carries the same projected-savings
   column.
 - **Bulk lookup mode**: a "Bulk" tab next to the instance-type label swaps the combobox
-  for a textarea (one instance type per line, or comma-separated). Submitting runs the
-  *same* matching logic once per (instance type × selected OS) pair and renders one
-  condensed summary row each — instance type, OS, price, cheapest match, savings, and a
-  "Details" button — rather than the full baseline-card-plus-table treatment used in
-  single mode, which doesn't scale past a handful of types. A type that's unrecognized
-  or excluded gets a one-line explanatory row instead of being silently skipped. Capped
-  at 300 unique entries per submission (a soft ceiling against a pathological paste, not
-  a realistic fleet size). "Details" jumps back to single mode pre-filled with that
-  exact type/OS for the full breakdown.
+  for a textarea, one entry per line: `instance_type` or `instance_type,count` (count
+  defaults to 1, so a plain list — the original bulk-mode format — still works
+  unchanged). Also tolerant of tabs/runs-of-spaces as the delimiter, a `#` comment line,
+  and a one-line CSV/TSV header (detected by its first cell not looking like an instance
+  type, i.e. no `.`) — see `parseFleetInput` in `app.js` for the exact rules. The same
+  type listed on more than one line has its counts summed rather than the later line
+  being dropped, since a real fleet export can legitimately repeat a type (e.g. split
+  across AZs). An **Import CSV** button next to the textarea reads a local `.csv`/`.txt`
+  file straight into it via `FileReader` (no upload — everything stays client-side)
+  so the list is still reviewable/editable before submitting.
+
+  Submitting runs the *same* matching logic once per (instance type × selected OS) pair
+  and renders one condensed summary row each — instance type, OS, count, price, cheapest
+  match, savings, fleet savings (the projected monthly/yearly savings scaled by that
+  line's count), and a "Details" button — rather than the full baseline-card-plus-table
+  treatment used in single mode, which doesn't scale past a handful of types. A type
+  that's unrecognized or excluded gets a one-line explanatory row instead of being
+  silently skipped. Capped at 300 unique entries per submission (a soft ceiling against
+  a pathological paste, not a realistic fleet size). "Details" jumps back to single mode
+  pre-filled with that exact type/OS for the full breakdown.
+
+  Whenever at least one line is priced, a **fleet summary** renders above the table:
+  stat tiles for current cost, optimized cost, and monthly/yearly savings (each summed
+  across every priced line, weighted by count), a one-line note ("N of M entries have a
+  cheaper option"), and a **Download report (CSV)** button exporting the full per-line
+  breakdown plus the same figures — built entirely client-side (`Blob` +
+  `URL.createObjectURL`), no server involved.
 - **By-specs mode**: a "By specs" tab swaps the instance-type field for two number
   inputs (min vCPU, min RAM in GiB), for a teammate who wants to shop by specs rather
   than convert a specific instance type. Submitting lists every current-generation type
@@ -228,12 +246,14 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
 - **Shareable URLs**: every search (region, mode, instance type(s) or specs, OS,
   Graviton/burstable toggles) is reflected in the URL query string on submit —
   `?region=...` plus `&type=...` (single mode), `&mode=bulk&types=...` (bulk mode,
-  comma-joined), or `&mode=specs&vcpu=...&ram=...` (by-specs mode). Loading a URL with
-  these params re-runs that exact search automatically, so a result can be bookmarked or
-  sent to a teammate. Manual submits push a new history entry (so back/forward step
-  through past searches in a session); the initial URL-driven load and browser
-  back/forward both replay via the same `applyUrlParams` path rather than pushing new
-  entries.
+  comma-joined, each entry `type` or `type:count` — `:` rather than `,` since `,`
+  already separates entries; a count of 1 is omitted, so old bulk-mode links without
+  counts still decode the same as before), or `&mode=specs&vcpu=...&ram=...` (by-specs
+  mode). Loading a URL with these params re-runs that exact search automatically, so a
+  result can be bookmarked or sent to a teammate. Manual submits push a new history
+  entry (so back/forward step through past searches in a session); the initial
+  URL-driven load and browser back/forward both replay via the same `applyUrlParams`
+  path rather than pushing new entries.
 
 ## Repo layout
 
