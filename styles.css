@@ -180,6 +180,17 @@ body {
   position: relative;
 }
 
+/* The generic ".field label" rule gives every label an 8px margin-bottom, meant to
+   space it from the control below it in normal block flow. Here the label is a flex
+   item inside label-group instead — that margin still counts toward the flex
+   container's auto height (margins aren't just "unused space" for a flex item), which
+   silently made the whole header row ~8px taller than field-region's plain label and
+   pushed the instance-type box below it out of alignment. field-instance-header's own
+   margin-bottom already provides the real spacing, so this one is redundant. */
+.field-instance-label-group label {
+  margin-bottom: 0;
+}
+
 /* Hoverable/focusable glossary for instance-type lettering (M vs C vs R, the g/i/a/d/n
    suffix after the generation number) — a plain title="" tooltip can't hold a
    multi-line list, so this is a small custom popover instead. */
