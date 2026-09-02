@@ -98,6 +98,12 @@
             <ul id="instance-type-list" class="combobox-list" role="listbox" hidden></ul>
           </div>
           <div class="bulk-mode-field" id="bulk-mode-field" hidden>
+            <textarea
+              id="bulk-instance-types"
+              class="bulk-textarea"
+              placeholder="instance_type,count&#10;m5.xlarge,12&#10;c5.2xlarge,4&#10;r5.large"
+              spellcheck="false"
+            ></textarea>
             <div class="bulk-toolbar">
               <label class="file-import-btn">
                 Import CSV
@@ -109,12 +115,6 @@
                 works too — count then defaults to 1).
               </span>
             </div>
-            <textarea
-              id="bulk-instance-types"
-              class="bulk-textarea"
-              placeholder="instance_type,count&#10;m5.xlarge,12&#10;c5.2xlarge,4&#10;r5.large"
-              spellcheck="false"
-            ></textarea>
           </div>
           <div class="specs-mode-field" id="specs-mode-field" hidden>
             <div class="specs-inputs">
