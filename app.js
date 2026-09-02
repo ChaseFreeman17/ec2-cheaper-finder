@@ -79,6 +79,7 @@ function cacheEls() {
   els.status = byId("status");
   els.results = byId("results");
   els.freshness = byId("data-freshness");
+  els.resetBtn = byId("reset-btn");
 }
 
 async function fetchJson(url) {
@@ -1189,6 +1190,32 @@ async function applyUrlParams(urlParams) {
   }
 }
 
+// The topbar "Home" button: strips region/mode/type/os/toggle params off the URL (so a
+// search someone shared with you doesn't come back on refresh) and puts every field back
+// to its as-loaded default, same as opening the site fresh — not just clearing the results.
+function resetSearch() {
+  history.pushState(null, "", location.pathname);
+
+  if (state.regionsIndex) {
+    const defaultRegion = pickDefaultRegion(state.regionsIndex);
+    els.regionSelect.value = defaultRegion;
+    if (defaultRegion !== state.currentRegion) setRegion(defaultRegion);
+  }
+
+  els.input.value = "";
+  els.bulkTextarea.value = "";
+  els.specsVcpu.value = "";
+  els.specsRam.value = "";
+  els.osWindows.checked = true;
+  els.osLinux.checked = false;
+  els.burstable.checked = true;
+  els.graviton.checked = false;
+  state.bulkSort = { key: null, dir: "desc" };
+
+  setMode("single"); // also clears results + status
+  els.form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 // ---- Search dispatch --------------------------------------------------------------
 
 function handleSearch(event) {
@@ -1321,6 +1348,7 @@ async function init() {
   els.regionSelect.addEventListener("change", (e) => setRegion(e.target.value));
   els.modeTabs.forEach((btn) => btn.addEventListener("click", () => setMode(btn.dataset.mode)));
   els.bulkFileInput.addEventListener("change", handleBulkFileImport);
+  els.resetBtn.addEventListener("click", resetSearch);
   window.addEventListener("popstate", () => {
     applyUrlParams(parseUrlParams()).catch((err) => console.error(err));
   });
