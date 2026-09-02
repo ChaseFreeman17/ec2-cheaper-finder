@@ -47,6 +47,17 @@ Then open the printed local URL. `data/regions/` is already checked into the rep
 JSON file per AWS region, refreshed daily by CI), so it works without fetching anything
 from AWS yourself.
 
+## Live version
+
+The footer shows "Live version: `<short-sha>`", linked to that commit on GitHub — fetched
+client-side from the public GitHub API (`GET /repos/.../commits/main`) on page load, so
+it's always the actual current tip of `main`, not something baked in at deploy time (this
+site has no build step to bake it in with). No auth token, no server of ours involved.
+
+That API call is unauthenticated and rate-limited (~60 requests/hour per visitor IP), and
+some privacy extensions block calls to `api.github.com`. Neither is treated as an error —
+the line just stays hidden, same as if `data-freshness` fails to load.
+
 ## Analytics
 
 The live site loads [Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/)

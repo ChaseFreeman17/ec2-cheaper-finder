@@ -31,6 +31,7 @@ const BURST_KIND_INFO = {
   },
 };
 
+const GITHUB_REPO = "ChaseFreeman17/ec2-undercut"; // for the footer's live-version link — see loadSiteVersion()
 const DEFAULT_REGION = "us-east-1";
 const MAX_COMBOBOX_RESULTS = 30;
 const MAX_BULK_TYPES = 300; // soft cap so a pathological paste can't freeze the tab
@@ -80,6 +81,7 @@ function cacheEls() {
   els.results = byId("results");
   els.freshness = byId("data-freshness");
   els.resetBtn = byId("reset-btn");
+  els.siteVersion = byId("site-version");
 }
 
 async function fetchJson(url) {
@@ -1338,6 +1340,44 @@ function renderFreshness(data) {
   els.freshness.textContent = `Pricing data (${data.regionName || data.region}, On-Demand) last refreshed ${formatted}. Source: ${data.source}.`;
 }
 
+// Footer line linking to the exact commit GitHub Pages is (or is about to be) serving,
+// so it's obvious whether the live site matches a given local checkout — see README's
+// "Live version" note. Hits the public, unauthenticated GitHub API directly from the
+// browser (no server of our own to ask), which is rate-limited (~60 req/hour per
+// visitor IP) and occasionally blocked by privacy extensions — both are just "no version
+// shown," not worth surfacing as an error for something this non-essential.
+async function loadSiteVersion() {
+  if (!els.siteVersion) return;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/commits/main`, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data = await res.json();
+    const sha = data.sha;
+    if (!sha) throw new Error("No commit SHA in response");
+
+    const commitDate = data.commit && data.commit.committer && data.commit.committer.date;
+    const when = commitDate
+      ? new Date(commitDate).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+      : null;
+
+    els.siteVersion.textContent = "Live version: ";
+    const link = el("a", {
+      href: `https://github.com/${GITHUB_REPO}/commit/${sha}`,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      text: sha.slice(0, 7),
+    });
+    els.siteVersion.appendChild(link);
+    if (when) els.siteVersion.appendChild(document.createTextNode(` (${when})`));
+    els.siteVersion.hidden = false;
+  } catch (err) {
+    console.warn("Couldn't load live version info:", err);
+    // Leave it hidden — nothing to show, and it started that way in the markup.
+  }
+}
+
 async function init() {
   cacheEls();
   els.form.addEventListener("submit", handleSearch);
@@ -1352,6 +1392,8 @@ async function init() {
   window.addEventListener("popstate", () => {
     applyUrlParams(parseUrlParams()).catch((err) => console.error(err));
   });
+
+  loadSiteVersion(); // independent of pricing data — don't let it block or delay the rest of init
 
   try {
     state.regionsIndex = await loadRegionsIndex();

@@ -1018,6 +1018,16 @@ body {
   margin: 4px 0;
 }
 
+.site-version a {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.site-version a:hover {
+  color: var(--text);
+}
+
 @media (max-width: 720px) {
   .search-card {
     grid-template-columns: 1fr;

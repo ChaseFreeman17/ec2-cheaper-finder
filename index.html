@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EC2 Undercut</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css?v=16" />
 </head>
 <body>
   <div class="page">
@@ -185,6 +185,7 @@
 
     <footer class="footer">
       <p id="data-freshness">Loading pricing data…</p>
+      <p id="site-version" class="site-version" hidden></p>
       <p class="scope-note">
         Scope: On-Demand pricing, current-generation candidates, vCPU/RAM at least as
         much as the baseline (never less), one region at a time. GPU, FPGA,
@@ -194,7 +195,7 @@
     </footer>
   </div>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
   <!-- Cloudflare Web Analytics: cookieless, no PII — https://developers.cloudflare.com/web-analytics/
        Classic script (not type="module") deliberately: module scripts are always
        CORS-checked by spec, a plain <script src> isn't — one less way for this to fail
