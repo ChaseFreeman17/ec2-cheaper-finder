@@ -41,6 +41,8 @@ const state = {
   currentRegion: null,
   instanceTypeOptions: [], // [{ type, excluded: reason|null }], for the current region
   mode: "single", // "single" | "bulk" — see setMode()
+  bulkRows: [], // last bulk-lookup result, kept around so sort clicks can re-render without re-searching
+  bulkSort: { key: null, dir: "desc" }, // "savings" | "fleet-savings" | null — persists across bulk searches
 };
 
 const combo = {
@@ -511,6 +513,7 @@ function showStatus(message, kind) {
 function clearResults() {
   els.results.hidden = true;
   els.results.innerHTML = "";
+  state.bulkRows = [];
 }
 
 // ---- Instance-type combobox --------------------------------------------------------
@@ -917,7 +920,62 @@ function viewDetails(instanceType, os) {
   els.form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function renderBulkTable(rows) {
+// ---- Bulk table sorting --------------------------------------------------------------
+// Only "match" rows have a real savings figure to rank by — everything else (excluded,
+// not-found, no-os, no-match) has nothing to compare and always sinks to the bottom,
+// in its original order, regardless of sort direction.
+const BULK_SORT_VALUE = {
+  savings: (row) => (row.kind === "match" ? row.baseline.pricePerHour - row.best.pricePerHour : null),
+  "fleet-savings": (row) =>
+    row.kind === "match" ? (row.baseline.pricePerHour - row.best.pricePerHour) * row.count : null,
+};
+
+function sortBulkRows(rows, sort) {
+  if (!sort || !sort.key) return rows;
+  const getValue = BULK_SORT_VALUE[sort.key];
+  const dir = sort.dir === "asc" ? 1 : -1;
+  const ranked = [];
+  const unranked = [];
+  for (const row of rows) {
+    const value = getValue(row);
+    if (value === null) unranked.push(row);
+    else ranked.push({ row, value });
+  }
+  ranked.sort((a, b) => (a.value - b.value) * dir);
+  return [...ranked.map((r) => r.row), ...unranked];
+}
+
+function onBulkSortClick(key) {
+  if (state.bulkSort.key === key) {
+    state.bulkSort.dir = state.bulkSort.dir === "desc" ? "asc" : "desc";
+  } else {
+    state.bulkSort = { key, dir: "desc" }; // switching columns starts at "highest savings first"
+  }
+  const oldTable = els.results.querySelector(".bulk-table");
+  if (oldTable) oldTable.replaceWith(renderBulkTable(state.bulkRows, state.bulkSort));
+}
+
+function renderSortableTh(label, key, sort, title) {
+  const active = sort.key === key;
+  const attrs = { class: "sortable-th" + (active ? " sortable-th-active" : ""), tabindex: "0", role: "button" };
+  if (title) attrs.title = title;
+  const th = el("th", attrs, [
+    el("span", { class: "sortable-th-label", text: label }),
+    el("span", { class: "sortable-th-arrow", text: active ? (sort.dir === "asc" ? "▲" : "▼") : "" }),
+  ]);
+  th.setAttribute("aria-sort", active ? (sort.dir === "asc" ? "ascending" : "descending") : "none");
+  const activate = () => onBulkSortClick(key);
+  th.addEventListener("click", activate);
+  th.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      activate();
+    }
+  });
+  return th;
+}
+
+function renderBulkTable(rows, sort) {
   if (rows.length === 0) {
     return el("p", { class: "empty-note", text: "Enter at least one instance type, one per line." });
   }
@@ -930,14 +988,19 @@ function renderBulkTable(rows) {
       el("th", { title: "Defaults to 1 if not given for this line, e.g. \"m5.xlarge,12\"", text: "Count" }),
       el("th", { text: "Price" }),
       el("th", { text: "Best match" }),
-      el("th", { text: "Savings" }),
-      el("th", { title: "Assumes each instance runs continuously (730 hrs/month, 8,760 hrs/year), scaled by count", text: "Fleet savings" }),
+      renderSortableTh("Savings", "savings", sort),
+      renderSortableTh(
+        "Fleet savings",
+        "fleet-savings",
+        sort,
+        "Assumes each instance runs continuously (730 hrs/month, 8,760 hrs/year), scaled by count"
+      ),
       el("th", { text: "" }),
     ]),
   ]);
   const tbody = el("tbody", null, []);
 
-  for (const row of rows) {
+  for (const row of sortBulkRows(rows, sort)) {
     if (row.kind === "not-found" || row.kind === "excluded") {
       const msg =
         row.kind === "excluded"
@@ -1225,6 +1288,7 @@ function runBulkSearch(regionData, osSelections, includeGraviton, includeBurstab
   }
 
   const rows = runBulkLookup(entries, osSelections, instances, excludedTypes, includeGraviton, includeBurstable);
+  state.bulkRows = rows;
 
   els.results.hidden = false;
   if (totalEntered > MAX_BULK_TYPES) {
@@ -1236,7 +1300,7 @@ function runBulkSearch(regionData, osSelections, includeGraviton, includeBurstab
   }
   const summary = renderFleetSummary(rows);
   if (summary) els.results.appendChild(summary);
-  els.results.appendChild(renderBulkTable(rows));
+  els.results.appendChild(renderBulkTable(rows, state.bulkSort));
 }
 
 function renderFreshness(data) {

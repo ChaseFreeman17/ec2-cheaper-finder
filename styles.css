@@ -768,6 +768,35 @@ body {
   border-bottom: none;
 }
 
+/* Bulk table's "Savings" / "Fleet savings" column headers double as sort buttons.
+   Unranked rows (excluded, not found, no match, etc.) have nothing to sort by and
+   always sink to the bottom in renderBulkTable's sortBulkRows — see app.js. */
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sortable-th:hover,
+.sortable-th:focus-visible {
+  color: var(--text);
+}
+
+.sortable-th:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.sortable-th-active {
+  color: var(--accent);
+}
+
+.sortable-th-arrow {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.7rem;
+}
+
 .results-table tbody tr:hover {
   background: var(--surface-alt);
 }

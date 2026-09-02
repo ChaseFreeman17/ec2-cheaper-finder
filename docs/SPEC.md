@@ -231,6 +231,15 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
   a pathological paste, not a realistic fleet size). "Details" jumps back to single mode
   pre-filled with that exact type/OS for the full breakdown.
 
+  The **Savings** and **Fleet savings** column headers are click-to-sort (also
+  Enter/Space when focused, `aria-sort` kept in sync) — first click on a column sorts
+  highest savings first, a second click reverses it. Rows with nothing to rank
+  (unrecognized/excluded/no-OS-pricing/no-cheaper-option) always sink to the bottom
+  regardless of direction, in their original order, since there's no value to compare.
+  The chosen sort persists across re-submitting the same bulk list (`state.bulkSort` in
+  `app.js`) but doesn't affect the fleet summary or the CSV export, which both stay in
+  input order.
+
   Whenever at least one line is priced, a **fleet summary** renders above the table:
   stat tiles for current cost, optimized cost, and monthly/yearly savings (each summed
   across every priced line, weighted by count), a one-line note ("N of M entries have a
