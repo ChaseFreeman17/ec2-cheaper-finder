@@ -208,9 +208,10 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
 - **Include burstable instance types toggle**: on by default — unlike Graviton, most
   teammates want burstable candidates visible (they're already called out with the
   ⚡ badge), so this defaults to showing them; turning it off filters burst-capable rows
-  out of candidates only, never hides a burstable baseline. A dependent sub-toggle,
-  **"Only match burstable types when the baseline is burstable too"** (off by default,
-  disabled/grayed out whenever the parent toggle is off), tightens this further: instead
+  out of candidates only, never hides a burstable baseline. A dependent sub-toggle right
+  below it, **"Only for burstable baselines"** (same switch styling as its parent, left-
+  aligned under it in `.toggle-group`; off by default, disabled/grayed out whenever the
+  parent toggle is off), tightens this further: instead
   of just allowing burstable candidates, only suggest one when the baseline itself is
   already burst-capable — protects against silently moving someone off fixed-performance
   CPU (m5/c5/r5/...) onto shared/bursting CPU (T-family, `*-flex`) as a "cheaper" swap.

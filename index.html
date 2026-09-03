@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EC2 Undercut</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="styles.css?v=19" />
 </head>
 <body>
   <div class="page">
@@ -167,9 +167,12 @@
               </span>
               <span class="toggle-label">Include burstable instance types</span>
             </label>
-            <label class="checkbox toggle-suboption" id="burstable-match-only-label">
-              <input type="checkbox" id="burstable-match-only" />
-              Only match burstable types when the baseline is burstable too
+            <label class="toggle toggle-suboption" id="burstable-match-only-label" title="Only suggest a burstable candidate when the baseline itself is already burstable">
+              <span class="toggle-switch">
+                <input type="checkbox" id="burstable-match-only" />
+                <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+              </span>
+              <span class="toggle-label">Only for burstable baselines</span>
             </label>
           </div>
           <label class="toggle">

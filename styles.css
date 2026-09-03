@@ -572,23 +572,17 @@ body {
   gap: 8px;
 }
 
-/* Indented under its parent toggle's label text (past the 38px switch + 10px gap) to
-   read as dependent on it — only means something when "Include burstable instance
-   types" is also on, since findMatches only reaches this filter after that one already
-   passed. See app.js's syncBurstableSubOption for the matching disabled state. */
-.toggle-suboption {
-  margin-left: 48px;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-.toggle-suboption input {
-  width: 14px;
-  height: 14px;
-}
-
+/* Same .toggle component as its parent (identical switch, so the two line up in the
+   .toggle-group column below it — no indent needed, stacking is enough). Only means
+   something when "Include burstable instance types" is also on, since findMatches only
+   reaches this filter after that one already passed — see app.js's
+   syncBurstableSubOption for the matching disabled state below. */
 .toggle-suboption.disabled {
   opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-suboption.disabled .toggle-switch input {
   cursor: not-allowed;
 }
 
