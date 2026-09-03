@@ -135,7 +135,13 @@ baseline row:
      exact-only)
    - `architecture` is `x86_64`, or `arm64` only if the Graviton toggle is on
    - `burstKind` is falsy, or truthy is fine if the "include burstable" toggle is on
-     (on by default — this only filters candidates, never hides a burstable baseline)
+     (on by default — this only filters candidates, never hides a burstable baseline).
+     If the "only match burstable when the baseline is burstable too" sub-toggle is also
+     on, a burstable candidate additionally requires the *baseline's* `burstKind` to be
+     truthy — so a fixed-performance baseline (m5, c5, r5, ...) never gets suggested a
+     shared/bursting-CPU type as its "cheaper" replacement. Off by default; meaningless
+     (and disabled in the UI) while "include burstable" itself is off, and not applied in
+     by-specs mode, which has no baseline to compare burstiness against.
    - `pricePerHour` < baseline's `pricePerHour`
 2. For each surviving row, compute:
    - `savingsPerHour = baseline.pricePerHour - candidate.pricePerHour`
@@ -202,7 +208,14 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
 - **Include burstable instance types toggle**: on by default — unlike Graviton, most
   teammates want burstable candidates visible (they're already called out with the
   ⚡ badge), so this defaults to showing them; turning it off filters burst-capable rows
-  out of candidates only, never hides a burstable baseline.
+  out of candidates only, never hides a burstable baseline. A dependent sub-toggle,
+  **"Only match burstable types when the baseline is burstable too"** (off by default,
+  disabled/grayed out whenever the parent toggle is off), tightens this further: instead
+  of just allowing burstable candidates, only suggest one when the baseline itself is
+  already burst-capable — protects against silently moving someone off fixed-performance
+  CPU (m5/c5/r5/...) onto shared/bursting CPU (T-family, `*-flex`) as a "cheaper" swap.
+  Single and bulk mode only — by-specs mode has no baseline to compare against, so it's
+  not offered there (the checkbox stays visible but has no effect in that mode).
 - **Results table**, sorted cheapest first, columns: instance type, price/hr, savings
   ($/hr and %), projected savings (monthly and yearly, assuming the instance runs
   continuously — 730 hrs/month, 8,760 hrs/year, the same averages AWS's own pricing
@@ -263,7 +276,9 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
   toggles apply) — no savings or flagged-differences columns, since there's no baseline
   to compare against.
 - **Shareable URLs**: every search (region, mode, instance type(s) or specs, OS,
-  Graviton/burstable toggles) is reflected in the URL query string on submit —
+  Graviton/burstable toggles, burstable-match-only sub-toggle) is reflected in the URL
+  query string on submit — `&burstableMatchOnly=1` when that sub-toggle is on (omitted,
+  like `graviton`, when off — its default) —
   `?region=...` plus `&type=...` (single mode), `&mode=bulk&types=...` (bulk mode,
   comma-joined, each entry `type` or `type:count` — `:` rather than `,` since `,`
   already separates entries; a count of 1 is omitted, so old bulk-mode links without

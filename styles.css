@@ -566,6 +566,32 @@ body {
   cursor: pointer;
 }
 
+.toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Indented under its parent toggle's label text (past the 38px switch + 10px gap) to
+   read as dependent on it — only means something when "Include burstable instance
+   types" is also on, since findMatches only reaches this filter after that one already
+   passed. See app.js's syncBurstableSubOption for the matching disabled state. */
+.toggle-suboption {
+  margin-left: 48px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.toggle-suboption input {
+  width: 14px;
+  height: 14px;
+}
+
+.toggle-suboption.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Explicit, sized positioning context for the switch — the input is absolutely
    positioned to exactly cover this box (inset: 0), rather than floating as a 0x0
    element with an implicit "static position" that different browsers/rendering paths

@@ -77,6 +77,8 @@ function cacheEls() {
   els.osWindows = byId("os-windows");
   els.osLinux = byId("os-linux");
   els.burstable = byId("burstable-toggle");
+  els.burstableMatchOnly = byId("burstable-match-only");
+  els.burstableMatchOnlyLabel = byId("burstable-match-only-label");
   els.graviton = byId("graviton-toggle");
   els.status = byId("status");
   els.results = byId("results");
@@ -152,7 +154,7 @@ function findExcludedReason(excludedTypes, instanceType) {
   return null;
 }
 
-function findMatches(instances, baseline, includeGraviton, includeBurstable) {
+function findMatches(instances, baseline, includeGraviton, includeBurstable, burstableMatchOnly) {
   return instances
     .filter((r) => {
       if (r.os !== baseline.os) return false;
@@ -164,9 +166,16 @@ function findMatches(instances, baseline, includeGraviton, includeBurstable) {
       if (r.vcpu < baseline.vcpu) return false;
       if (r.memoryGiB < baseline.memoryGiB) return false;
       if (r.architecture === "arm64" && !includeGraviton) return false;
-      // The toggle only filters candidates, not the baseline — a burstable baseline is
-      // still searched normally even with "include burstable" off.
-      if (r.burstKind && !includeBurstable) return false;
+      // Both toggles only filter candidates, not the baseline — a burstable baseline is
+      // still searched normally even with "include burstable" off. burstableMatchOnly is
+      // the stricter, opt-in refinement of includeBurstable: don't just allow burstable
+      // candidates, only suggest one if the baseline itself is already burstable — so a
+      // fixed-performance baseline (m5, c5, r5, ...) never gets switched onto shared/
+      // bursting CPU as a "cheaper" option.
+      if (r.burstKind) {
+        if (!includeBurstable) return false;
+        if (burstableMatchOnly && !baseline.burstKind) return false;
+      }
       if (!(r.pricePerHour < baseline.pricePerHour)) return false;
       return true;
     })
@@ -488,7 +497,7 @@ function renderSpecsTable(matches) {
   return table;
 }
 
-function renderOsSection(osLabel, baseline, instances, includeGraviton, includeBurstable) {
+function renderOsSection(osLabel, baseline, instances, includeGraviton, includeBurstable, burstableMatchOnly) {
   const section = el("div", { class: "os-section" }, [
     el("h2", { text: osLabel }),
   ]);
@@ -503,7 +512,7 @@ function renderOsSection(osLabel, baseline, instances, includeGraviton, includeB
     return section;
   }
 
-  const matches = findMatches(instances, baseline, includeGraviton, includeBurstable);
+  const matches = findMatches(instances, baseline, includeGraviton, includeBurstable, burstableMatchOnly);
   section.appendChild(renderBaselineCard(baseline));
   section.appendChild(renderResultsTable(baseline, matches));
   return section;
@@ -739,7 +748,7 @@ function parseFleetInput(text) {
   return [...merged.values()];
 }
 
-function runBulkLookup(entries, osSelections, instances, excludedTypes, includeGraviton, includeBurstable) {
+function runBulkLookup(entries, osSelections, instances, excludedTypes, includeGraviton, includeBurstable, burstableMatchOnly) {
   const rows = [];
   for (const { type: inputType, count, invalidCount } of entries) {
     if (!anyRowMatchesType(instances, inputType)) {
@@ -753,7 +762,7 @@ function runBulkLookup(entries, osSelections, instances, excludedTypes, includeG
         rows.push({ inputType, os, kind: "no-os", count });
         continue;
       }
-      const matches = findMatches(instances, baseline, includeGraviton, includeBurstable);
+      const matches = findMatches(instances, baseline, includeGraviton, includeBurstable, burstableMatchOnly);
       if (matches.length === 0) {
         rows.push({ inputType, os, kind: "no-match", baseline, count });
       } else {
@@ -1185,6 +1194,7 @@ function buildSearchParams() {
 
   if (els.graviton.checked) params.set("graviton", "1");
   if (!els.burstable.checked) params.set("burstable", "0");
+  if (els.burstableMatchOnly.checked) params.set("burstableMatchOnly", "1");
 
   if (state.mode === "bulk") {
     params.set("mode", "bulk");
@@ -1242,6 +1252,7 @@ function parseUrlParams() {
     os: osParam ? osParam.split(",").map((s) => s.trim().toLowerCase()) : null,
     graviton: params.get("graviton") === "1",
     burstable: burstableParam === null ? true : burstableParam !== "0",
+    burstableMatchOnly: params.get("burstableMatchOnly") === "1",
   };
 }
 
@@ -1259,6 +1270,8 @@ async function applyUrlParams(urlParams) {
   }
   els.graviton.checked = urlParams.graviton;
   els.burstable.checked = urlParams.burstable;
+  els.burstableMatchOnly.checked = urlParams.burstableMatchOnly;
+  syncBurstableSubOption();
 
   if (urlParams.mode === "bulk") {
     els.bulkTextarea.value = urlParams.types;
@@ -1271,6 +1284,17 @@ async function applyUrlParams(urlParams) {
     els.input.value = urlParams.type;
     if (urlParams.type) runSearch(false);
   }
+}
+
+// "Only match burstable types when the baseline is burstable too" only means anything
+// while "Include burstable instance types" is itself on — disable (and gray out) it
+// otherwise, rather than leave it interactive but silently inert. Called on the parent
+// toggle's change event and everywhere else its checked state is set programmatically
+// (setting .checked in JS doesn't fire "change").
+function syncBurstableSubOption() {
+  const enabled = els.burstable.checked;
+  els.burstableMatchOnly.disabled = !enabled;
+  els.burstableMatchOnlyLabel.classList.toggle("disabled", !enabled);
 }
 
 // The topbar "Home" button: strips region/mode/type/os/toggle params off the URL (so a
@@ -1292,6 +1316,8 @@ function resetSearch() {
   els.osWindows.checked = true;
   els.osLinux.checked = false;
   els.burstable.checked = true;
+  els.burstableMatchOnly.checked = false;
+  syncBurstableSubOption();
   els.graviton.checked = false;
   state.bulkSort = { key: null, dir: "desc" };
   state.bulkFilters = { hideNonActionable: false, minSavingsPercent: 0 };
@@ -1329,12 +1355,16 @@ function runSearch(pushHistory) {
   const includeGraviton = els.graviton.checked;
   const includeBurstable = els.burstable.checked;
 
+  // Meaningless without a baseline to compare burstiness against, so specs mode (which
+  // has no baseline) never reads this — see findMatches vs. findSpecMatches.
+  const burstableMatchOnly = els.burstableMatchOnly.checked;
+
   if (state.mode === "bulk") {
-    runBulkSearch(regionData, osSelections, includeGraviton, includeBurstable);
+    runBulkSearch(regionData, osSelections, includeGraviton, includeBurstable, burstableMatchOnly);
   } else if (state.mode === "specs") {
     runSpecsSearch(regionData, osSelections, includeGraviton, includeBurstable);
   } else {
-    runSingleSearch(regionData, osSelections, includeGraviton, includeBurstable);
+    runSingleSearch(regionData, osSelections, includeGraviton, includeBurstable, burstableMatchOnly);
   }
 }
 
@@ -1356,7 +1386,7 @@ function runSpecsSearch(regionData, osSelections, includeGraviton, includeBursta
   }
 }
 
-function runSingleSearch(regionData, osSelections, includeGraviton, includeBurstable) {
+function runSingleSearch(regionData, osSelections, includeGraviton, includeBurstable, burstableMatchOnly) {
   const { instances, excludedTypes } = regionData;
   const instanceType = els.input.value.trim();
   if (!instanceType) {
@@ -1383,11 +1413,13 @@ function runSingleSearch(regionData, osSelections, includeGraviton, includeBurst
   els.results.hidden = false;
   for (const os of osSelections) {
     const baseline = findBaselineRow(instances, instanceType, os);
-    els.results.appendChild(renderOsSection(os, baseline, instances, includeGraviton, includeBurstable));
+    els.results.appendChild(
+      renderOsSection(os, baseline, instances, includeGraviton, includeBurstable, burstableMatchOnly)
+    );
   }
 }
 
-function runBulkSearch(regionData, osSelections, includeGraviton, includeBurstable) {
+function runBulkSearch(regionData, osSelections, includeGraviton, includeBurstable, burstableMatchOnly) {
   const { instances, excludedTypes } = regionData;
   const allEntries = parseFleetInput(els.bulkTextarea.value);
   const entries = allEntries.slice(0, MAX_BULK_TYPES);
@@ -1398,7 +1430,9 @@ function runBulkSearch(regionData, osSelections, includeGraviton, includeBurstab
     return;
   }
 
-  const rows = runBulkLookup(entries, osSelections, instances, excludedTypes, includeGraviton, includeBurstable);
+  const rows = runBulkLookup(
+    entries, osSelections, instances, excludedTypes, includeGraviton, includeBurstable, burstableMatchOnly
+  );
   state.bulkRows = rows;
 
   els.results.hidden = false;
@@ -1473,6 +1507,8 @@ async function init() {
   els.regionSelect.addEventListener("change", (e) => setRegion(e.target.value));
   els.modeTabs.forEach((btn) => btn.addEventListener("click", () => setMode(btn.dataset.mode)));
   els.bulkFileInput.addEventListener("change", handleBulkFileImport);
+  els.burstable.addEventListener("change", syncBurstableSubOption);
+  syncBurstableSubOption(); // sync to the checkbox's initial (checked) state in the markup
   els.resetBtn.addEventListener("click", resetSearch);
   window.addEventListener("popstate", () => {
     applyUrlParams(parseUrlParams()).catch((err) => console.error(err));
