@@ -453,10 +453,28 @@ body {
   padding: 0;
   border: none;
   background: none;
+  /* Without these, a bare <input type="number"> falls back to the browser's own form-
+     control font/color instead of this page's — on Windows Chrome in dark mode that's a
+     jarring oversized, off-color, mismatched-font render (not this app's styling at
+     all). font: inherit pulls in the same family/size/weight/line-height .search-card
+     already sets on everything else. */
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  -moz-appearance: textfield; /* Firefox: hides its native spinner */
 }
 
 .specs-input input:focus {
   outline: none;
+}
+
+/* Hide the native up/down spinner (Chrome/Safari/Edge) — an OS-skinned widget that
+   clashes with this box's custom dark styling. Typing, or the up/down arrow keys while
+   focused, still work; there's just nothing drawn for them. */
+.specs-input input::-webkit-outer-spin-button,
+.specs-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .specs-hint {
