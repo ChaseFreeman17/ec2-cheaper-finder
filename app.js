@@ -42,8 +42,9 @@ const state = {
   currentRegion: null,
   instanceTypeOptions: [], // [{ type, excluded: reason|null }], for the current region
   mode: "single", // "single" | "bulk" — see setMode()
-  bulkRows: [], // last bulk-lookup result, kept around so sort clicks can re-render without re-searching
+  bulkRows: [], // last bulk-lookup result, kept around so sort/filter changes can re-render without re-searching
   bulkSort: { key: null, dir: "desc" }, // "savings" | "fleet-savings" | null — persists across bulk searches
+  bulkFilters: { hideNonActionable: false, minSavingsPercent: 0 }, // persists across bulk searches, like bulkSort
 };
 
 const combo = {
@@ -948,14 +949,94 @@ function sortBulkRows(rows, sort) {
   return [...ranked.map((r) => r.row), ...unranked];
 }
 
+// ---- Bulk table filtering -------------------------------------------------------------
+// Two independent, combinable filters for narrowing a big fleet paste down to what's
+// actually worth acting on — separate from sorting, which only reorders. Only "match"
+// rows have a savings % to compare (see BULK_SORT_VALUE above for why), so a positive
+// minSavingsPercent excludes every other kind too, same as hideNonActionable does.
+function matchSavingsPercent(row) {
+  if (row.kind !== "match") return null;
+  return ((row.baseline.pricePerHour - row.best.pricePerHour) / row.baseline.pricePerHour) * 100;
+}
+
+function bulkRowPassesFilters(row, filters) {
+  if (filters.hideNonActionable && row.kind !== "match") return false;
+  if (filters.minSavingsPercent > 0) {
+    const pct = matchSavingsPercent(row);
+    if (pct === null || pct < filters.minSavingsPercent) return false;
+  }
+  return true;
+}
+
+function filterBulkRows(rows, filters) {
+  return rows.filter((row) => bulkRowPassesFilters(row, filters));
+}
+
+// The table itself (rows.length === 0 there just means "nothing submitted"), plus a
+// count note when filters are hiding rows, plus a distinct message when filters hide
+// *everything* — wrapped together so sort/filter changes can swap this whole area out
+// without touching the filter bar's own controls (which would lose focus/mid-typing
+// state on every keystroke in the min-savings input — see onBulkFilterChange).
+function renderBulkTableArea(rows, sort, filters) {
+  if (rows.length === 0) return renderBulkTable(rows, sort);
+
+  const filtered = filterBulkRows(rows, filters);
+  const wrapper = el("div", { class: "bulk-table-area-inner" }, []);
+
+  if (filtered.length !== rows.length) {
+    wrapper.appendChild(
+      el("p", { class: "bulk-filter-count" }, [
+        `Showing ${filtered.length} of ${rows.length} row${rows.length === 1 ? "" : "s"} — adjust the filters above to see the rest.`,
+      ])
+    );
+  }
+
+  wrapper.appendChild(
+    filtered.length === 0
+      ? el("p", { class: "empty-note", text: "No rows match the current filters." })
+      : renderBulkTable(filtered, sort)
+  );
+  return wrapper;
+}
+
+function rerenderBulkTableArea() {
+  const area = els.results.querySelector(".bulk-table-area");
+  if (area) area.replaceChildren(renderBulkTableArea(state.bulkRows, state.bulkSort, state.bulkFilters));
+}
+
 function onBulkSortClick(key) {
   if (state.bulkSort.key === key) {
     state.bulkSort.dir = state.bulkSort.dir === "desc" ? "asc" : "desc";
   } else {
     state.bulkSort = { key, dir: "desc" }; // switching columns starts at "highest savings first"
   }
-  const oldTable = els.results.querySelector(".bulk-table");
-  if (oldTable) oldTable.replaceWith(renderBulkTable(state.bulkRows, state.bulkSort));
+  rerenderBulkTableArea();
+}
+
+function renderBulkFilterBar(filters) {
+  const actionableCheckbox = el("input", { type: "checkbox", id: "bulk-filter-actionable" }, []);
+  actionableCheckbox.checked = filters.hideNonActionable;
+  actionableCheckbox.addEventListener("change", () => {
+    state.bulkFilters.hideNonActionable = actionableCheckbox.checked;
+    rerenderBulkTableArea();
+  });
+
+  const minSavingsInput = el(
+    "input",
+    { type: "number", id: "bulk-filter-min-savings", min: "0", max: "99", step: "1", placeholder: "0" },
+    []
+  );
+  minSavingsInput.value = filters.minSavingsPercent > 0 ? String(filters.minSavingsPercent) : "";
+  minSavingsInput.addEventListener("input", () => {
+    const n = parseFloat(minSavingsInput.value);
+    state.bulkFilters.minSavingsPercent = Number.isFinite(n) && n > 0 ? n : 0;
+    rerenderBulkTableArea();
+  });
+
+  return el("div", { class: "bulk-filter-bar" }, [
+    el("label", { class: "checkbox bulk-filter-checkbox" }, [actionableCheckbox, "Hide rows with no cheaper option"]),
+    el("label", { class: "bulk-filter-percent" }, ["Min savings % ≥", minSavingsInput]),
+  ]);
 }
 
 function renderSortableTh(label, key, sort, title) {
@@ -1213,6 +1294,7 @@ function resetSearch() {
   els.burstable.checked = true;
   els.graviton.checked = false;
   state.bulkSort = { key: null, dir: "desc" };
+  state.bulkFilters = { hideNonActionable: false, minSavingsPercent: 0 };
 
   setMode("single"); // also clears results + status
   els.form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1329,7 +1411,10 @@ function runBulkSearch(regionData, osSelections, includeGraviton, includeBurstab
   }
   const summary = renderFleetSummary(rows);
   if (summary) els.results.appendChild(summary);
-  els.results.appendChild(renderBulkTable(rows, state.bulkSort));
+  els.results.appendChild(renderBulkFilterBar(state.bulkFilters));
+  els.results.appendChild(
+    el("div", { class: "bulk-table-area" }, [renderBulkTableArea(rows, state.bulkSort, state.bulkFilters)])
+  );
 }
 
 function renderFreshness(data) {

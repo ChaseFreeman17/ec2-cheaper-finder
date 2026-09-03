@@ -895,6 +895,51 @@ body {
   padding: 8px 0;
 }
 
+.bulk-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+/* .checkbox already gives this the same look as the OS checkboxes; this just adds the
+   spacing that class's normal siblings (a fieldset) provide instead. */
+.bulk-filter-checkbox {
+  font-size: 0.85rem;
+}
+
+.bulk-filter-percent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: text;
+}
+
+.bulk-filter-percent input {
+  width: 64px;
+  font-size: 0.9rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.bulk-filter-percent input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.bulk-filter-count {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin: 0 0 8px;
+}
+
 .bulk-table .no-diff {
   font-style: italic;
 }

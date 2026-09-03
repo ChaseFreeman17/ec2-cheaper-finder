@@ -240,6 +240,16 @@ Single page, plain HTML/CSS/vanilla JS, modern styling (dark-mode-aware, no fram
   `app.js`) but doesn't affect the fleet summary or the CSV export, which both stay in
   input order.
 
+  A **filter bar** above the table narrows which rows *display* (same non-effect on the
+  fleet summary/CSV as sorting) — a checkbox ("Hide rows with no cheaper option", i.e.
+  only `kind === "match"` rows) and a "Min savings % ≥" number field, combinable, both
+  persisting across re-submissions (`state.bulkFilters`). The percent field filters live
+  as you type; a positive value excludes every row that isn't a priced `match` above that
+  threshold, same as the checkbox does for kind alone. A count note ("Showing N of M
+  rows...") appears whenever filters hide anything, and a distinct message replaces the
+  table entirely if a filter matches nothing — see `renderBulkTableArea`/
+  `bulkRowPassesFilters` in `app.js`.
+
   Whenever at least one line is priced, a **fleet summary** renders above the table:
   stat tiles for current cost, optimized cost, and monthly/yearly savings (each summed
   across every priced line, weighted by count), a one-line note ("N of M entries have a
